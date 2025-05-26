@@ -1,0 +1,1 @@
+CREATE DATABASE user_event_generator_db;
