@@ -3,7 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"synthetic-data-generator/env"
+	"synthetic-data-generator/internal/env"
 
 	_ "github.com/lib/pq"
 )

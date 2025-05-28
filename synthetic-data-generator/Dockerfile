@@ -2,19 +2,19 @@
 FROM golang:1.24.2
 
 # Set the working directory inside the container
-WORKDIR /synthetic-data-generator
+WORKDIR /app
 
-# Copy Go modules manifests
+# Copy Go module files
 COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy the rest of your app
+# Copy the full source code
 COPY . .
 
-# Build the Go app
-RUN go build -o synthetic-data-generator .
+# Build the Go app using the correct main file
+RUN go build -o synthetic-data-generator ./cmd/main
 
 # Run the binary
 CMD ["./synthetic-data-generator"]

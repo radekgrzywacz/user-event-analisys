@@ -42,7 +42,8 @@ services:
     build: ./synthetic-data-generator
     container_name: synthetic-data-generator
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DB_HOST: db
       DB_PORT: 5432

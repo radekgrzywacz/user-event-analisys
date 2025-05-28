@@ -4,13 +4,13 @@ import (
 	"database/sql"
 	"flag"
 	"log"
-	"synthetic-data-generator/db"
-	"synthetic-data-generator/env"
+	"synthetic-data-generator/internal/db"
+	"synthetic-data-generator/internal/env"
 )
 
 type Config struct {
 	Flags Flags
-	db    *sql.DB
+	DB   *sql.DB
 }
 
 type Flags struct {
@@ -29,7 +29,7 @@ func SetupConfig() Config {
 
 	return Config{
 		Flags: parseFlags(),
-		db:    db,
+		DB:    db,
 	}
 }
 

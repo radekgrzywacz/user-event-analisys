@@ -1,4 +1,9 @@
-package entity
+package user
+
+type Store interface {
+	Save(User) error
+	GetAvailableUsers(neededCount int) ([]User, error)
+}
 
 type User struct {
 	ID        int    `json:"id"`
