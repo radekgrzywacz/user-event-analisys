@@ -50,3 +50,11 @@ func (s *UserService) CreateMore(amount int) ([]User, error) {
 
 	return users, nil
 }
+
+func (s *UserService) GetUserById(userId int) (User, error) {
+	user, err := s.store.GetUserById(userId)
+	if err != nil {
+		return User{}, fmt.Errorf("Error retrieving user: %w", err)
+	}
+	return user, nil
+}

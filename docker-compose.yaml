@@ -42,6 +42,8 @@ services:
     build: ./synthetic-data-generator
     container_name: synthetic-data-generator
     depends_on:
+      http-ingestor:
+        condition: service_healthy
       db:
         condition: service_healthy
     environment:
@@ -50,9 +52,22 @@ services:
       DB_USER: postgres 
       DB_PASSWORD: postgres 
       DB_NAME: user_event_generator_db
+      INGESTOR_URL: http-ingestor
     ports:
       - "8080:8080"
     command: ["./synthetic-data-generator"]
+    
+  http-ingestor:
+    build: ./http-ingestor
+    container_name: http-ingestor
+    ports:
+      - "8081:8081"
+    command: ["./http-ingestor"]
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8081/ingestor"]
+        interval: 5s
+        timeout: 3s
+        retries: 5
 
 volumes:
   pgdata:

@@ -3,6 +3,7 @@ package user
 type Store interface {
 	Save(User) error
 	GetAvailableUsers(neededCount int) ([]User, error)
+	GetUserById(userId int) (User, error)
 }
 
 type User struct {
