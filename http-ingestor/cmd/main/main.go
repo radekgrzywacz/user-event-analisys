@@ -37,8 +37,16 @@ func getData(w http.ResponseWriter, r *http.Request) {
 	log.Println("--------------------------------------------")
 }
 
+func healthcheck(w http.ResponseWriter, r *http.Request) {
+	// log.Println("Healthcheck reached")
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, `{"message": "Healthchecked successfully"}`)
+}
+
 func main() {
 	http.HandleFunc("/ingestor", getData)
+	http.HandleFunc("/healthcheck", healthcheck)
 
 	log.Print("Ingestor server starting...")
 	err := http.ListenAndServe(":8081", nil)

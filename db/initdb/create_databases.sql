@@ -1,1 +1,1 @@
-CREATE DATABASE user_event_generator_db;
+CREATE DATABASE user_event_analysis_db;

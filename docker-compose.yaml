@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: postgres 
       POSTGRES_PASSWORD: postgres 
-      POSTGRES_DB: user_event_analysis_db
+      POSTGRES_DB: user_event_generator_db
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/initdb:/docker-entrypoint-initdb.d
@@ -46,6 +46,8 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
+      migrate-generator: 
+        condition: service_completed_successfully
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -64,7 +66,7 @@ services:
       - "8081:8081"
     command: ["./http-ingestor"]
     healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:8081/ingestor"]
+        test: ["CMD", "curl", "-f", "http://localhost:8081/healthcheck"]
         interval: 5s
         timeout: 3s
         retries: 5
