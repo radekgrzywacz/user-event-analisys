@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"synthetic-data-generator/internal/env"
 	"synthetic-data-generator/internal/user"
@@ -80,10 +79,6 @@ func (g *Generator) SendEvent(event Event) error {
 	}
 
 	defer resp.Body.Close()
-
-	log.Printf("Status received from server is: %s", resp.Status)
-	log.Printf("StatusCode received from server is: %d", resp.StatusCode)
-	log.Printf("Content Type received from Server is: %s", resp.Header["Content-Type"][0])
 
 	return nil
 }

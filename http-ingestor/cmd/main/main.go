@@ -11,8 +11,8 @@ import (
 )
 
 func getData(w http.ResponseWriter, r *http.Request) {
-	log.Println("------------ Got data request --------------")
 
+	log.Println("------------ Got data request --------------")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println("Error reading body:", err)
@@ -24,21 +24,19 @@ func getData(w http.ResponseWriter, r *http.Request) {
 	var prettyJSON map[string]interface{}
 	if err := json.Unmarshal(body, &prettyJSON); err != nil {
 		log.Println("Error parsing JSON:", err)
-		log.Println("Raw body:", string(body))
 	} else {
 		prettyBody, _ := json.MarshalIndent(prettyJSON, "", "  ")
 		fmt.Println("Parsed JSON Body:\n", string(prettyBody))
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	io.WriteString(w, `{"message": "Data received successfully"}`)
-
 	log.Println("--------------------------------------------")
+	w.Header().Set("Content-Type", "application/json")
+	io.WriteString(w, `{"message": "Data received successfully"}`)
+	w.WriteHeader(http.StatusAccepted)
+
 }
 
 func healthcheck(w http.ResponseWriter, r *http.Request) {
-	// log.Println("Healthcheck reached")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	io.WriteString(w, `{"message": "Healthchecked successfully"}`)
