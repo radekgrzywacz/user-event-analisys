@@ -42,12 +42,6 @@ func setupKafka() (*kgo.Client, error) {
 }
 
 func (app *App) getDataForKafka(w http.ResponseWriter, r *http.Request) {
-	cl, err := setupKafka()
-	if err != nil {
-		panic(err)
-	}
-	defer cl.Close()
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println("Error reading body:", err)

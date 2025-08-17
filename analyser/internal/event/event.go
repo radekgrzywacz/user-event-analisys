@@ -1,6 +1,10 @@
 package event
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 type EventType string
 
@@ -25,4 +29,26 @@ type Metadata struct {
 	IP        string `json:"ip"`
 	UserAgent string `json:"user_agent"`
 	Country   string `json:"country"`
+}
+
+func (m *Metadata) UnmarshallJSON(data []byte) error {
+	var v [3]string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+
+	m.IP = v[0]
+	m.UserAgent = v[1]
+	m.Country = v[2]
+	return nil
+}
+
+func ParseEvent(e []byte) (Event, error) {
+	var event Event
+	if err := json.Unmarshal(e, &event); err != nil {
+		return Event{}, err
+	}
+
+	fmt.Printf("%#v\n", event)
+	return event, nil
 }
