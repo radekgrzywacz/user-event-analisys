@@ -2,6 +2,9 @@ services:
   db:
     image: postgres:15
     container_name: postgres
+    profiles:
+      - "all"
+      - "dev"
     restart: always
     environment:
       POSTGRES_USER: postgres 
@@ -21,9 +24,12 @@ services:
   migrate-generator:
     image: migrate/migrate
     container_name: migrate-generator
+    profiles:
+      - "all"
+      - "dev"
     volumes:
       - ./migrations/generator:/migrations
-    command: -source=file://migrations -database postgres://postgres:postgres@db:5432/user_event_generator_db?sslmode=disable up
+    command: -source=file:///migrations -database postgres://postgres:postgres@db:5432/user_event_generator_db?sslmode=disable up
     depends_on:
       db:
         condition: service_healthy
@@ -31,9 +37,12 @@ services:
   migrate-system:
     image: migrate/migrate
     container_name: migrate-system
+    profiles:
+      - "all"
+      - "dev"
     volumes:
       - ./migrations/system:/migrations
-    command: -source=file://migrations -database postgres://postgres:postgres@db:5432/user_event_analysis_db?sslmode=disable up
+    command: -source=file:///migrations -database postgres://postgres:postgres@db:5432/user_event_analysis_db?sslmode=disable up
     depends_on:
       db:
         condition: service_healthy
@@ -41,6 +50,9 @@ services:
   synthetic-data-generator:
     build: ./synthetic-data-generator
     container_name: synthetic-data-generator
+    profiles:
+      - "all"
+      - "dev"
     depends_on:
       http-ingestor:
         condition: service_healthy
@@ -62,6 +74,9 @@ services:
   http-ingestor:
     build: ./http-ingestor
     container_name: http-ingestor
+    profiles:
+      - "all"
+      - "dev"
     ports:
       - "8081:8081"
     command: ["./http-ingestor"]
@@ -78,6 +93,8 @@ services:
   analyser:
     build: ./analyser
     container_name: analyser
+    profiles:
+      - "all"
     ports: 
       - "8082:8082"
     command: ["./analyser"]
@@ -85,11 +102,15 @@ services:
       - http-ingestor
     environment:
       KAFKA_URL: "kafka:29092" 
+      REDIS_URL: "redis"
       RUNNING_IN_DOCKER: "1"
       
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
     container_name: zookeeper
+    profiles:
+      - "all"
+      - "dev"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -99,6 +120,9 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
+    profiles:
+      - "all"
+      - "dev"
     depends_on:
       - zookeeper
     ports:
@@ -114,6 +138,9 @@ services:
   init-kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: init-kafka
+    profiles:
+      - "all"
+      - "dev"
     depends_on:
       - kafka
     entrypoint: [ '/bin/sh', '-c' ]
@@ -129,5 +156,18 @@ services:
       kafka-topics --bootstrap-server kafka:29092 --list
       "
 
+  redis:
+    image: redis:8.2
+    container_name: redis
+    profiles:
+      - "all"
+      - "dev"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+
 volumes:
   pgdata:
+  redis-data:

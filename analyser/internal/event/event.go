@@ -2,7 +2,6 @@ package event
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 )
 
@@ -49,6 +48,5 @@ func ParseEvent(e []byte) (Event, error) {
 		return Event{}, err
 	}
 
-	fmt.Printf("%#v\n", event)
 	return event, nil
 }
