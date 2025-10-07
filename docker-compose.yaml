@@ -28,7 +28,7 @@ services:
       - "all"
       - "dev"
     volumes:
-      - ./migrations/generator:/migrations
+      - ./synthetic-data-generator/db/schema:/migrations
     command: -source=file:///migrations -database postgres://postgres:postgres@db:5432/user_event_generator_db?sslmode=disable up
     depends_on:
       db:
@@ -41,7 +41,7 @@ services:
       - "all"
       - "dev"
     volumes:
-      - ./migrations/system:/migrations
+      - ./analyser/db/schema:/migrations          
     command: -source=file:///migrations -database postgres://postgres:postgres@db:5432/user_event_analysis_db?sslmode=disable up
     depends_on:
       db:

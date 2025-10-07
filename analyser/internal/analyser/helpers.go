@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -53,6 +55,7 @@ func countAverageOccurancesInPreviousWindows(
 	eventType event.EventType,
 	windowsAmount, userId int,
 	rdb *redis.Client,
+	windowSize time.Duration,
 ) (float32, error) {
 	if windowsAmount == 0 {
 		return 0, fmt.Errorf("windowsAmount cannot be zero")
@@ -62,8 +65,8 @@ func countAverageOccurancesInPreviousWindows(
 	totalOccurrences := 0.0
 
 	for i := 2; i <= windowsAmount+1; i++ {
-		start := now.Add(-time.Duration(i) * time.Hour).Unix()
-		end := now.Add(-time.Duration(i-1) * time.Hour).Unix()
+		start := now.Add(-time.Duration(i) * windowSize).Unix()
+		end := now.Add(-time.Duration(i-1) * windowSize).Unix()
 
 		events, err := getEventsFromWindow(userId, rdb, start, end)
 		if err != nil {
@@ -80,13 +83,14 @@ func countStdDevOfOccourancesInPreviousWindows(
 	eventType event.EventType,
 	windowsAmount, userId int,
 	rdb *redis.Client,
+	windowSize time.Duration,
 ) (float64, error) {
 	now := time.Now()
 	var counts []float64
 
 	for i := 2; i < windowsAmount+1; i++ {
-		start := now.Add(-time.Duration(i) * time.Hour).Unix()
-		end := now.Add(-time.Duration(i-1) * time.Hour).Unix()
+		start := now.Add(-time.Duration(i) * windowSize).Unix()
+		end := now.Add(-time.Duration(i-1) * windowSize).Unix()
 
 		events, err := getEventsFromWindow(userId, rdb, start, end)
 		if err != nil {
@@ -110,4 +114,49 @@ func countStdDevOfOccourancesInPreviousWindows(
 	variance /= float64(len(counts))
 
 	return math.Sqrt(variance), nil
+}
+
+func countOccuranceTimeStdDev(e event.Event, rdb *redis.Client) (float64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	vals, err := rdb.HGetAll(ctx, fmt.Sprintf("user:%d:activity_hours", e.UserId)).Result()
+	if err != nil {
+		return 0, fmt.Errorf("Could not get activity hours of user with id: %d", e.UserId)
+	}
+
+	hourlyCounts := make(map[int]int)
+	for k, v := range vals {
+		intKey, err := strconv.Atoi(k)
+		if err != nil {
+			log.Printf("Could not convert the key: %v", err)
+			continue
+		}
+
+		intVal, err := strconv.Atoi(v)
+		if err != nil {
+			log.Printf("Could not convert the value: %v", err)
+			continue
+		}
+
+		hourlyCounts[intKey] = intVal
+	}
+
+	var total, count float64
+	for h := 0; h < 24; h++ {
+		v := float64(hourlyCounts[h])
+		total += v
+		count++
+	}
+
+	mean := total / count
+
+	var variance float64
+	for h := 0; h < 24; h++ {
+		v := float64(hourlyCounts[h])
+		variance += math.Pow(v-mean, 2)
+	}
+
+	stdDev := math.Sqrt(variance / count)
+	return stdDev, nil
 }
