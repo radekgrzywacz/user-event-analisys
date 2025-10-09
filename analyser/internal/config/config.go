@@ -2,8 +2,11 @@ package config
 
 import (
 	"analyser/internal/env"
+	"analyser/internal/store"
+	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
@@ -11,12 +14,16 @@ import (
 type Config struct {
 	Kafka *kgo.Client
 	Redis *redis.Client
+	Pg    *store.Queries
 }
 
 func setupKafka() (*kgo.Client, error) {
 	broker := env.GetEnvString("KAFKA_URL", "localhost:9092")
 
-	cl, err := kgo.NewClient(kgo.SeedBrokers(broker), kgo.ConsumeTopics("events"))
+	cl, err := kgo.NewClient(kgo.SeedBrokers(broker),
+		kgo.ConsumeTopics("events"),
+		kgo.ConsumerGroup("analyser-group"),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create consumer client: %v", err)
 	}
@@ -32,6 +39,18 @@ func setupRedis() *redis.Client {
 	})
 }
 
+func setupPostgres() (*store.Queries, error) {
+	url := env.GetEnvString("POSTGRES_RUL", "postgres://postgres:postgres@localhost:5432/user_event_analysis_db?sslmode=disable")
+	dsn := env.GetEnvString("POSTGRES_DSN", url)
+
+	pool, err := pgxpool.New(context.Background(), dsn)
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect to PostgreSQL: %w", err)
+	}
+
+	return store.New(pool), nil
+}
+
 func SetupConfig() (*Config, error) {
 	kafka, err := setupKafka()
 	if err != nil {
@@ -39,9 +58,14 @@ func SetupConfig() (*Config, error) {
 	}
 
 	redis := setupRedis()
+	pg, err := setupPostgres()
+	if err != nil {
+		return nil, fmt.Errorf("Error setting up Postgres: %w", err)
+	}
 
 	return &Config{
 		Kafka: kafka,
 		Redis: redis,
+		Pg:    pg,
 	}, nil
 }

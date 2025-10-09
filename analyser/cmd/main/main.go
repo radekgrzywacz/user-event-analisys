@@ -46,7 +46,7 @@ func main() {
 						log.Println("error parsing record")
 						return
 					}
-					err = analyser.Process(event, config.Redis)
+					err = analyser.Process(event, config.Redis, config.Pg)
 					if err != nil {
 						log.Printf("Processing error: %v", err)
 						return

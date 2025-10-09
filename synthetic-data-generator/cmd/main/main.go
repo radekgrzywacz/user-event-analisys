@@ -78,6 +78,7 @@ func setupGeneratorAndUsers(cfg *config.Config) ([]user.User, *event.Generator, 
 func main() {
 	_ = godotenv.Load("../../.env")
 	config := config.SetupConfig()
+	log.Print(config.Flags)
 
 	users, generator, err := setupGeneratorAndUsers(&config)
 	if err != nil {

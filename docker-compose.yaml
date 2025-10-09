@@ -69,7 +69,7 @@ services:
       INGESTOR_URL: http-ingestor
     ports:
       - "8080:8080"
-    command: ["./synthetic-data-generator"]
+    command: ["./synthetic-data-generator", "-duration", "0", "-concurrency", "2", "-users", "10"]
     
   http-ingestor:
     build: ./http-ingestor
@@ -103,6 +103,7 @@ services:
     environment:
       KAFKA_URL: "kafka:29092" 
       REDIS_URL: "redis"
+      POSTGRES_URL: "postgres://postgres:postgres@db:5432/user_event_analysis_db?sslmode=disable"
       RUNNING_IN_DOCKER: "1"
       
   zookeeper:
@@ -134,6 +135,9 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     
   init-kafka:
     image: confluentinc/cp-kafka:7.6.0
@@ -168,6 +172,35 @@ services:
       - redis-data:/data
     command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
 
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    profiles:
+      - "all"
+      - "dev"
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+
+      GF_DATABASE_TYPE: postgres
+      GF_DATABASE_HOST: db:5432
+      GF_DATABASE_NAME: user_event_analysis_db
+      GF_DATABASE_USER: postgres
+      GF_DATABASE_PASSWORD: postgres
+
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+
 volumes:
   pgdata:
   redis-data:
+  grafana-data:
