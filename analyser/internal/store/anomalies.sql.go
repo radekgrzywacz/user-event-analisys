@@ -16,7 +16,6 @@ SELECT id,
        user_id,
        event_id,
        anomaly_type,
-       score,
        details,
        detected_at
 FROM anomalies
@@ -37,7 +36,6 @@ func (q *Queries) GetAnomaliesByEvent(ctx context.Context, eventID pgtype.Int8) 
 			&i.UserID,
 			&i.EventID,
 			&i.AnomalyType,
-			&i.Score,
 			&i.Details,
 			&i.DetectedAt,
 		); err != nil {
@@ -56,7 +54,6 @@ SELECT id,
        user_id,
        event_id,
        anomaly_type,
-       score,
        details,
        detected_at
 FROM anomalies
@@ -84,7 +81,6 @@ func (q *Queries) GetAnomaliesByUser(ctx context.Context, arg GetAnomaliesByUser
 			&i.UserID,
 			&i.EventID,
 			&i.AnomalyType,
-			&i.Score,
 			&i.Details,
 			&i.DetectedAt,
 		); err != nil {
@@ -103,11 +99,10 @@ INSERT INTO anomalies (
     user_id,
     event_id,
     anomaly_type,
-    score,
     details,
     detected_at
 )
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id
 `
 
@@ -115,7 +110,6 @@ type InsertAnomalyParams struct {
 	UserID      int32
 	EventID     pgtype.Int8
 	AnomalyType string
-	Score       pgtype.Float8
 	Details     []byte
 	DetectedAt  pgtype.Timestamptz
 }
@@ -125,7 +119,6 @@ func (q *Queries) InsertAnomaly(ctx context.Context, arg InsertAnomalyParams) (i
 		arg.UserID,
 		arg.EventID,
 		arg.AnomalyType,
-		arg.Score,
 		arg.Details,
 		arg.DetectedAt,
 	)

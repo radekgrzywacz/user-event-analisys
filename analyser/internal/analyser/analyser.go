@@ -4,14 +4,16 @@ import (
 	"analyser/internal/event"
 	"analyser/internal/store"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
 type AnalyseResult struct {
-	Anomaly   bool   `json:"anomaly"`
-	Message   string `json:"message"`
-	Timestamp string `json:"timestamp"`
+	Anomaly     bool      `json:"anomaly"`
+	Message     string    `json:"message"`
+	Timestamp   time.Time `json:"timestamp"`
+	AnomalyType string    `json:"anomaly_type"`
 }
 
 // TODO: Dodać do redisa:
@@ -21,30 +23,41 @@ type AnalyseResult struct {
 // 4. Za duzo failed loginow
 
 func Process(event event.Event, rdb *redis.Client, pg *store.Queries) error {
-	// result, err := analyseCached(event, rdb)
-	// if err != nil {
-	// 	return fmt.Errorf("Error analysing cached data: %w", err)
-	// }
-	// if result.Anomaly {
-	// 	// TODO: Process anomaly
-	// }
-	// result, err = analyseStatistics(event, rdb)
-	// if err != nil {
-	// 	return fmt.Errorf("%w", err)
-	// }
-	// if result.Anomaly {
-	// 	// TODO: Process anomaly
-	// }
-
-	if err := addEventToRedis(event, rdb); err != nil {
-		return fmt.Errorf("Redis insert failed: %w", err)
-	}
-	if err := recordTransition(event, rdb); err != nil {
-		return fmt.Errorf("Redis transition record failed: %w", err)
+	result, err := analyseCached(event, rdb)
+	if err != nil {
+		return fmt.Errorf("error analysing cached data: %w", err)
 	}
 
+	if result.Anomaly {
+		if err := putEventToRedis(event, rdb); err != nil {
+			return fmt.Errorf("redis insert failed for anomaly event: %w", err)
+		}
+		if _, err := saveAnomalyToPostgres(pg, event, result); err != nil {
+			return fmt.Errorf("postgres insert failed for anomaly: %w", err)
+		}
+		return nil
+	}
+
+	result, err = analyseStatistics(event, rdb)
+	if err != nil {
+		return fmt.Errorf("error analysing statistics: %w", err)
+	}
+
+	if result.Anomaly {
+		if err := putEventToRedis(event, rdb); err != nil {
+			return fmt.Errorf("redis insert failed for anomaly event: %w", err)
+		}
+		if _, err := saveAnomalyToPostgres(pg, event, result); err != nil {
+			return fmt.Errorf("postgres insert failed for anomaly: %w", err)
+		}
+		return nil
+	}
+
+	if err := putEventToRedis(event, rdb); err != nil {
+		return fmt.Errorf("redis insert failed for normal event: %w", err)
+	}
 	if _, err := saveEventToPostgres(pg, event); err != nil {
-		return fmt.Errorf("Postgres insert failed: %w", err)
+		return fmt.Errorf("postgres insert failed for normal event: %w", err)
 	}
 
 	return nil

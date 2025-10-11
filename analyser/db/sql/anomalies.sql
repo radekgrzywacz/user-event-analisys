@@ -3,11 +3,10 @@ INSERT INTO anomalies (
     user_id,
     event_id,
     anomaly_type,
-    score,
     details,
     detected_at
 )
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id;
 
 -- name: GetAnomaliesByUser :many
@@ -15,7 +14,6 @@ SELECT id,
        user_id,
        event_id,
        anomaly_type,
-       score,
        details,
        detected_at
 FROM anomalies
@@ -28,7 +26,6 @@ SELECT id,
        user_id,
        event_id,
        anomaly_type,
-       score,
        details,
        detected_at
 FROM anomalies

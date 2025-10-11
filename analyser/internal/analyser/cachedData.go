@@ -97,25 +97,28 @@ func checkStoredUserData(event event.Event, rdb *redis.Client) AnalyseResult {
 	res := rdb.SIsMember(ctx, fmt.Sprintf("user:%d:ips", event.UserId), event.Metadata.IP)
 	if !res.Val() {
 		return AnalyseResult{
-			Anomaly:   res.Val(),
-			Message:   "IP address never seen before",
-			Timestamp: time.Now().Format("20060102150405"),
+			Anomaly:     true,
+			AnomalyType: "new_ip",
+			Message:     "IP address never seen before",
+			Timestamp:   time.Now(),
 		}
 	}
 	res = rdb.SIsMember(ctx, fmt.Sprintf("user:%d:user_agents", event.UserId), event.Metadata.UserAgent)
 	if !res.Val() {
 		return AnalyseResult{
-			Anomaly:   res.Val(),
-			Message:   "User agent never seen before",
-			Timestamp: time.Now().Format("20060102150405"),
+			Anomaly:     true,
+			AnomalyType: "new_user_agent",
+			Message:     "User agent never seen before",
+			Timestamp:   time.Now(),
 		}
 	}
 	res = rdb.SIsMember(ctx, fmt.Sprintf("user:%d:countries", event.UserId), event.Metadata.Country)
 	if !res.Val() {
 		return AnalyseResult{
-			Anomaly:   res.Val(),
-			Message:   "Country never seen before",
-			Timestamp: time.Now().Format("20060102150405"),
+			Anomaly:     true,
+			AnomalyType: "new_country",
+			Message:     "Country never seen before",
+			Timestamp:   time.Now(),
 		}
 	}
 	return AnalyseResult{}
@@ -143,17 +146,19 @@ func checkEventZScore(eventType event.EventType, e event.Event, rdb *redis.Clien
 	}
 	if stdDev == 0 {
 		return AnalyseResult{
-			Anomaly:   false,
-			Message:   "Standard deviation is zero; insufficient variance for Z-score analysis",
-			Timestamp: time.Now().Format("20060102150405"),
+			Anomaly:     false,
+			AnomalyType: "no_variance",
+			Message:     "Standard deviation is zero; insufficient variance for Z-score analysis",
+			Timestamp:   time.Now(),
 		}, nil
 	}
 
 	zScore := float64(eventsCount-int(previousAverage)) / stdDev
 	return AnalyseResult{
-		Anomaly:   math.Abs(zScore) > 3,
-		Message:   fmt.Sprintf("Z-Score for %s: %.2f", eventType, zScore),
-		Timestamp: time.Now().Format("20060102150405"),
+		Anomaly:     math.Abs(zScore) > 3,
+		AnomalyType: "zscore_outlier",
+		Message:     fmt.Sprintf("Z-Score for %s: %.2f", eventType, zScore),
+		Timestamp:   time.Now(),
 	}, nil
 }
 
@@ -218,16 +223,17 @@ func checkTimeDeviation(e event.Event, rdb *redis.Client) (AnalyseResult, error)
 
 	if float64(val) < stdDev {
 		return AnalyseResult{
-			Anomaly:   true,
-			Message:   fmt.Sprintf("Activity at unusual hour %d. Count=%d < stdDev=%.2f", hour, val, stdDev),
-			Timestamp: time.Now().Format("20060102150405"),
+			Anomaly:     true,
+			AnomalyType: "time_deviation",
+			Message:     fmt.Sprintf("Activity at unusual hour %d. Count=%d < stdDev=%.2f", hour, val, stdDev),
+			Timestamp:   time.Now(),
 		}, nil
 	}
 
 	return AnalyseResult{
 		Anomaly:   false,
 		Message:   "",
-		Timestamp: time.Now().Format("20060102150405"),
+		Timestamp: time.Now(),
 	}, nil
 }
 
@@ -258,9 +264,10 @@ func checkForValidEventTransition(e event.Event, rdb *redis.Client) (AnalyseResu
 	allowedNext, ok := allowedTransitions[lastEvent.Type]
 	if !ok {
 		return AnalyseResult{
-			Anomaly:   true,
-			Message:   fmt.Sprintf("No transition rule form previous event type %s", lastEvent.Type),
-			Timestamp: time.Now().Format("20060102150405"),
+			Anomaly:     true,
+			AnomalyType: "unknown_transition_rule",
+			Message:     fmt.Sprintf("No transition rule form previous event type %s", lastEvent.Type),
+			Timestamp:   time.Now(),
 		}, nil
 	}
 
@@ -271,9 +278,10 @@ func checkForValidEventTransition(e event.Event, rdb *redis.Client) (AnalyseResu
 	}
 
 	return AnalyseResult{
-		Anomaly:   true,
-		Message:   fmt.Sprintf("Disallowed transition: %s->%s", lastEvent.Type, e.Type),
-		Timestamp: time.Now().Format("20060102150405"),
+		Anomaly:     true,
+		AnomalyType: "invalid_transition",
+		Message:     fmt.Sprintf("Disallowed transition: %s->%s", lastEvent.Type, e.Type),
+		Timestamp:   time.Now(),
 	}, nil
 }
 
@@ -291,7 +299,7 @@ func checkMarkovAnomaly(e event.Event, rdb *redis.Client) (AnalyseResult, error)
 	json.Unmarshal([]byte(events[1]), &prev2)
 	json.Unmarshal([]byte(events[0]), &prev1)
 
-	histogramKey := fmt.Sprintf("user:%d", e.UserId)
+	histogramKey := fmt.Sprintf("user:%d:transitions", e.UserId)
 
 	prefix := fmt.Sprintf("%s->%s->%s", prev2.Type, prev1.Type, e.Type)
 	allTransitions, err := rdb.HGetAll(ctx, histogramKey).Result()
@@ -318,9 +326,10 @@ func checkMarkovAnomaly(e event.Event, rdb *redis.Client) (AnalyseResult, error)
 	probability := float64(count) / float64(total)
 	if probability < 0.05 {
 		return AnalyseResult{
-			Anomaly:   true,
-			Message:   fmt.Sprintf("Unusual transition %s->%s->%s", prev2.Type, prev1.Type, e.Type),
-			Timestamp: time.Now().Format("20060102150405"),
+			Anomaly:     true,
+			AnomalyType: "markov_low_probability",
+			Message:     fmt.Sprintf("Unusual transition %s->%s->%s", prev2.Type, prev1.Type, e.Type),
+			Timestamp:   time.Now(),
 		}, nil
 	}
 

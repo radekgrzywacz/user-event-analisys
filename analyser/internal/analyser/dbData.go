@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/redis/go-redis/v9"
 )
 
 func saveEventToPostgres(pg *store.Queries, ev event.Event) (int64, error) {
@@ -30,4 +31,40 @@ func saveEventToPostgres(pg *store.Queries, ev event.Event) (int64, error) {
 		Country:   pgtype.Text{String: ev.Metadata.Country, Valid: ev.Metadata.Country != ""},
 		Metadata:  meta,
 	})
+}
+
+func saveAnomalyToPostgres(pg *store.Queries, ev event.Event, res AnalyseResult) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	eventId, err := saveEventToPostgres(pg, ev)
+	if err != nil {
+		return 0, fmt.Errorf("Could not save an event: %w", err)
+	}
+
+	details, err := json.Marshal(map[string]interface{}{
+		"message": res.Message,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("Could not marshal anomaly message: %w", err)
+	}
+
+	return pg.InsertAnomaly(ctx, store.InsertAnomalyParams{
+		UserID:      int32(ev.UserId),
+		EventID:     pgtype.Int8{Int64: eventId, Valid: true},
+		AnomalyType: res.AnomalyType,
+		Details:     details,
+		DetectedAt:  pgtype.Timestamptz{Time: res.Timestamp, Valid: true},
+	})
+}
+
+func putEventToRedis(event event.Event, rdb *redis.Client) error {
+	if err := addEventToRedis(event, rdb); err != nil {
+		return fmt.Errorf("Redis insert failed: %w", err)
+	}
+	if err := recordTransition(event, rdb); err != nil {
+		return fmt.Errorf("Redis transition record failed: %w", err)
+	}
+
+	return nil
 }

@@ -1,0 +1,2 @@
+ALTER TABLE anomalies
+DROP COLUMN IF EXISTS score;

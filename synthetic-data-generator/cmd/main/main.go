@@ -20,6 +20,7 @@ func runRandomAnomaly(g *event.Generator, userID int) {
 		func(id int) error { return g.RunBruteForceScenario(id, 5) },
 		g.RunAccountTakeoverScenario,
 		func(id int) error { return g.RunBotActivityScenario(id, 3) },
+		g.RunFraudTransactionScenario,
 	}
 
 	selected := scenarios[rand.IntN(len(scenarios))]
@@ -46,12 +47,13 @@ func simulateUsers(users []user.User, config *config.Config, generator *event.Ge
 
 				if rand.Float64() < config.Flags.AnomalyRate {
 					runRandomAnomaly(generator, u.ID)
+					log.Printf("Anomaly sent for user ID %d", u.ID)
 				} else {
 					if err := generator.RunNormalUserScenario(u.ID); err != nil {
-						log.Printf("❌ Error running normal scenario for user %d: %v", u.ID, err)
+						log.Printf("Error running normal scenario for user %d: %v", u.ID, err)
 					}
+					log.Printf("Event sent for user ID %d", u.ID)
 				}
-				log.Printf("✅ Event sent for user ID %d", u.ID)
 			}(currentUser)
 
 			time.Sleep(300 * time.Millisecond)

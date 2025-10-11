@@ -13,7 +13,6 @@ type Anomaly struct {
 	UserID      int32
 	EventID     pgtype.Int8
 	AnomalyType string
-	Score       pgtype.Float8
 	Details     []byte
 	DetectedAt  pgtype.Timestamptz
 }
