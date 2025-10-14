@@ -39,6 +39,21 @@ func (g *Generator) CreateGoodEvent(userId int, eventType EventType) (Event, err
 			UserAgent: user.UserAgent,
 			Country:   user.Country,
 		},
+		Additional: make(map[string]interface{}),
+	}
+
+	switch eventType {
+	case EventPayment:
+		event.Additional["value"] = g.faker.Price(10, 10000)
+		event.Additional["currency"] = "EUR"
+		event.Additional["merchant"] = g.faker.Company()
+	case EventLogin:
+		event.Additional["device"] = g.faker.AppName()
+		event.Additional["source"] = []string{"WEB", "MOBILE"}[g.faker.Number(0, 1)]
+	case EventLogout:
+		event.Additional["duration"] = g.faker.Number(30, 600)
+	default:
+		event.Additional["source"] = "WEB"
 	}
 
 	return event, nil
@@ -59,6 +74,21 @@ func (g *Generator) CreateRandomEvent(userId int, eventType EventType) (Event, e
 			UserAgent: g.faker.UserAgent(),
 			Country:   g.faker.Country(),
 		},
+		Additional: make(map[string]interface{}),
+	}
+
+	switch eventType {
+	case EventPayment:
+		event.Additional["value"] = g.faker.Price(1000, 100000)
+		event.Additional["currency"] = g.faker.CurrencyShort()
+		event.Additional["merchant"] = g.faker.Company()
+	case EventLogin:
+		event.Additional["device"] = g.faker.AppName()
+		event.Additional["source"] = []string{"WEB", "API", "TOR", "VPN"}[g.faker.Number(0, 3)]
+	case EventLogout:
+		event.Additional["duration"] = g.faker.Number(0, 5) // podejrzanie krótka sesja
+	default:
+		event.Additional["source"] = "UNKNOWN"
 	}
 
 	return event, nil

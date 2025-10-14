@@ -3,13 +3,17 @@ package event
 import (
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func (g *Generator) RunNormalUserScenario(userID int) error {
+	sessionId := uuid.NewString()
 	login, err := g.CreateGoodEvent(userID, EventLogin)
 	if err != nil {
 		return err
 	}
+	login.SessionId = sessionId
 	if err := g.SendEvent(login); err != nil {
 		return err
 	}
@@ -20,6 +24,7 @@ func (g *Generator) RunNormalUserScenario(userID int) error {
 	if err != nil {
 		return err
 	}
+	payment.SessionId = sessionId
 	if err := g.SendEvent(payment); err != nil {
 		return err
 	}
@@ -27,6 +32,7 @@ func (g *Generator) RunNormalUserScenario(userID int) error {
 	time.Sleep(1 * time.Second)
 
 	logout, err := g.CreateGoodEvent(userID, EventLogout)
+	logout.SessionId = sessionId
 	if err != nil {
 		return err
 	}
@@ -64,10 +70,12 @@ func (g *Generator) RunBruteForceScenario(userID int, attempts int) error {
 }
 
 func (g *Generator) RunAccountTakeoverScenario(userID int) error {
+	sessionId := uuid.NewString()
 	login, err := g.CreateGoodEvent(userID, EventLogin)
 	if err != nil {
 		return err
 	}
+	login.SessionId = sessionId
 	if err := g.SendEvent(login); err != nil {
 		return fmt.Errorf("sending initial login: %w", err)
 	}
@@ -78,6 +86,7 @@ func (g *Generator) RunAccountTakeoverScenario(userID int) error {
 	if err != nil {
 		return err
 	}
+	reset.SessionId = sessionId
 	if err := g.SendEvent(reset); err != nil {
 		return fmt.Errorf("sending password reset: %w", err)
 	}
@@ -88,6 +97,7 @@ func (g *Generator) RunAccountTakeoverScenario(userID int) error {
 	if err != nil {
 		return err
 	}
+	loginAfterReset.SessionId = sessionId
 	if err := g.SendEvent(loginAfterReset); err != nil {
 		return fmt.Errorf("sending login after reset: %w", err)
 	}
@@ -96,6 +106,7 @@ func (g *Generator) RunAccountTakeoverScenario(userID int) error {
 }
 
 func (g *Generator) RunBotActivityScenario(userID int, count int) error {
+	sessionId := uuid.NewString()
 	types := []EventType{EventLogin, EventLogout, EventPayment, EventOther}
 
 	for i := 0; i < count; i++ {
@@ -106,6 +117,7 @@ func (g *Generator) RunBotActivityScenario(userID int, count int) error {
 		if err != nil {
 			return fmt.Errorf("creating bot event #%d: %w", i+1, err)
 		}
+		ev.SessionId = sessionId
 		if err := g.SendEvent(ev); err != nil {
 			return fmt.Errorf("sending bot event #%d: %w", i+1, err)
 		}
@@ -116,10 +128,12 @@ func (g *Generator) RunBotActivityScenario(userID int, count int) error {
 }
 
 func (g *Generator) RunFraudTransactionScenario(userID int) error {
+	sessionId := uuid.NewString()
 	login, err := g.CreateGoodEvent(userID, EventLogin)
 	if err != nil {
 		return err
 	}
+	login.SessionId = sessionId
 	if err := g.SendEvent(login); err != nil {
 		return fmt.Errorf("sending login: %w", err)
 	}
@@ -130,6 +144,7 @@ func (g *Generator) RunFraudTransactionScenario(userID int) error {
 	if err != nil {
 		return err
 	}
+	payment.SessionId = sessionId
 	if err := g.SendEvent(payment); err != nil {
 		return fmt.Errorf("sending fraudulent payment: %w", err)
 	}

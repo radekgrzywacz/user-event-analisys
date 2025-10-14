@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"synthetic-data-generator/internal/env"
 
 	_ "github.com/lib/pq"
@@ -16,6 +17,7 @@ func Connect() (*sql.DB, error) {
 		env.GetEnvString("DB_PORT", "5432"),
 		env.GetEnvString("DB_NAME", "postgres"),
 	)
+	log.Println(conStr)
 
 	db, err := sql.Open("postgres", conStr)
 	if err != nil {
