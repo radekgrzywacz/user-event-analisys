@@ -31,20 +31,33 @@ SELECT id,
        country,
        metadata,
        created_at
+       session_id
 FROM events
 ORDER BY timestamp DESC
 LIMIT $1
 `
 
-func (q *Queries) GetAllEvents(ctx context.Context, limit int32) ([]Event, error) {
+type GetAllEventsRow struct {
+	ID        int64
+	UserID    int32
+	EventType string
+	Timestamp pgtype.Timestamptz
+	Ip        pgtype.Text
+	UserAgent pgtype.Text
+	Country   pgtype.Text
+	Metadata  []byte
+	SessionID pgtype.Timestamptz
+}
+
+func (q *Queries) GetAllEvents(ctx context.Context, limit int32) ([]GetAllEventsRow, error) {
 	rows, err := q.db.Query(ctx, getAllEvents, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Event
+	var items []GetAllEventsRow
 	for rows.Next() {
-		var i Event
+		var i GetAllEventsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
@@ -54,7 +67,7 @@ func (q *Queries) GetAllEvents(ctx context.Context, limit int32) ([]Event, error
 			&i.UserAgent,
 			&i.Country,
 			&i.Metadata,
-			&i.CreatedAt,
+			&i.SessionID,
 		); err != nil {
 			return nil, err
 		}
@@ -75,7 +88,8 @@ SELECT id,
        user_agent,
        country,
        metadata,
-       created_at
+       created_at,
+       session_id
 FROM events
 WHERE id = $1
 `
@@ -93,6 +107,7 @@ func (q *Queries) GetEventById(ctx context.Context, id int64) (Event, error) {
 		&i.Country,
 		&i.Metadata,
 		&i.CreatedAt,
+		&i.SessionID,
 	)
 	return i, err
 }
@@ -106,7 +121,8 @@ SELECT id,
        user_agent,
        country,
        metadata,
-       created_at
+       created_at,
+       session_id
 FROM events
 WHERE user_id = $1
 ORDER BY timestamp DESC
@@ -137,6 +153,7 @@ func (q *Queries) GetEventsByUser(ctx context.Context, arg GetEventsByUserParams
 			&i.Country,
 			&i.Metadata,
 			&i.CreatedAt,
+			&i.SessionID,
 		); err != nil {
 			return nil, err
 		}
@@ -156,9 +173,10 @@ INSERT INTO events (
     ip,
     user_agent,
     country,
-    metadata
+    metadata,
+    session_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id
 `
 
@@ -170,6 +188,7 @@ type InsertEventParams struct {
 	UserAgent pgtype.Text
 	Country   pgtype.Text
 	Metadata  []byte
+	SessionID pgtype.Text
 }
 
 func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (int64, error) {
@@ -181,6 +200,7 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (int64
 		arg.UserAgent,
 		arg.Country,
 		arg.Metadata,
+		arg.SessionID,
 	)
 	var id int64
 	err := row.Scan(&id)

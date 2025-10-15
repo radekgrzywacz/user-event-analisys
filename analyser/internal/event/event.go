@@ -21,6 +21,7 @@ type Event struct {
 	Type       EventType              `json:"type"`
 	Timestamp  time.Time              `json:"timestamp"`
 	Metadata   Metadata               `json:"metadata"`
+	SessionId  string                 `json:"session_id"`
 	Additional map[string]interface{} `json:"additional"`
 }
 

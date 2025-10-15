@@ -1,2 +1,2 @@
-ALTER TABLE users
+ALTER TABLE events
 ADD COLUMN session_id TEXT

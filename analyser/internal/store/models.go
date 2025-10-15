@@ -27,6 +27,7 @@ type Event struct {
 	Country   pgtype.Text
 	Metadata  []byte
 	CreatedAt pgtype.Timestamptz
+	SessionID pgtype.Text
 }
 
 type User struct {

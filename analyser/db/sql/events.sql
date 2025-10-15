@@ -6,9 +6,10 @@ INSERT INTO events (
     ip,
     user_agent,
     country,
-    metadata
+    metadata,
+    session_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id;
 
 -- name: GetEventById :one
@@ -20,7 +21,8 @@ SELECT id,
        user_agent,
        country,
        metadata,
-       created_at
+       created_at,
+       session_id
 FROM events
 WHERE id = $1;
 
@@ -33,7 +35,8 @@ SELECT id,
        user_agent,
        country,
        metadata,
-       created_at
+       created_at,
+       session_id
 FROM events
 WHERE user_id = $1
 ORDER BY timestamp DESC
@@ -49,6 +52,7 @@ SELECT id,
        country,
        metadata,
        created_at
+       session_id
 FROM events
 ORDER BY timestamp DESC
 LIMIT $1;

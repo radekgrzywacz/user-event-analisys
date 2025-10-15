@@ -29,6 +29,7 @@ func saveEventToPostgres(pg *store.Queries, ev event.Event) (int64, error) {
 		Ip:        pgtype.Text{String: ev.Metadata.IP, Valid: ev.Metadata.IP != ""},
 		UserAgent: pgtype.Text{String: ev.Metadata.UserAgent, Valid: ev.Metadata.UserAgent != ""},
 		Country:   pgtype.Text{String: ev.Metadata.Country, Valid: ev.Metadata.Country != ""},
+		SessionID: pgtype.Text{String: ev.SessionId, Valid: ev.SessionId != ""},
 		Metadata:  meta,
 	})
 }

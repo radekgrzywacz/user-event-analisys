@@ -1,2 +1,2 @@
-ALTER TABLE users
+ALTER TABLE events
 DROP COLUMN IF EXISTS session_id;
