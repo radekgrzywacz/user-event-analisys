@@ -51,71 +51,6 @@ func countEventTypeOccuranceInWindow(t event.EventType, events []event.Event) in
 	return count
 }
 
-func countAverageOccurancesInPreviousWindows(
-	eventType event.EventType,
-	windowsAmount, userId int,
-	rdb *redis.Client,
-	windowSize time.Duration,
-) (float32, error) {
-	if windowsAmount == 0 {
-		return 0, fmt.Errorf("windowsAmount cannot be zero")
-	}
-
-	now := time.Now()
-	totalOccurrences := 0.0
-
-	for i := 2; i <= windowsAmount+1; i++ {
-		start := now.Add(-time.Duration(i) * windowSize).Unix()
-		end := now.Add(-time.Duration(i-1) * windowSize).Unix()
-
-		events, err := getEventsFromWindow(userId, rdb, start, end)
-		if err != nil {
-			return 0, fmt.Errorf("could not get events for window %d: %w", i, err)
-		}
-
-		totalOccurrences += float64(countEventTypeOccuranceInWindow(eventType, events))
-	}
-
-	return float32(totalOccurrences) / float32(windowsAmount), nil
-}
-
-func countStdDevOfOccourancesInPreviousWindows(
-	eventType event.EventType,
-	windowsAmount, userId int,
-	rdb *redis.Client,
-	windowSize time.Duration,
-) (float64, error) {
-	now := time.Now()
-	var counts []float64
-
-	for i := 2; i < windowsAmount+1; i++ {
-		start := now.Add(-time.Duration(i) * windowSize).Unix()
-		end := now.Add(-time.Duration(i-1) * windowSize).Unix()
-
-		events, err := getEventsFromWindow(userId, rdb, start, end)
-		if err != nil {
-			return 0, fmt.Errorf("Could not get events for window %d: %w", i, err)
-		}
-
-		count := countEventTypeOccuranceInWindow(eventType, events)
-		counts = append(counts, float64(count))
-	}
-
-	var sum float64
-	for _, c := range counts {
-		sum += c
-	}
-	mean := sum / float64(len(counts))
-
-	var variance float64
-	for _, c := range counts {
-		variance += (c - mean) * (c + mean)
-	}
-	variance /= float64(len(counts))
-
-	return math.Sqrt(variance), nil
-}
-
 func countOccuranceTimeStdDev(e event.Event, rdb *redis.Client) (float64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -159,4 +94,60 @@ func countOccuranceTimeStdDev(e event.Event, rdb *redis.Client) (float64, error)
 
 	stdDev := math.Sqrt(variance / count)
 	return stdDev, nil
+}
+
+func updateEMA(rdb *redis.Client, userId int, eventType event.EventType, current float64, alpha float64) (float64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	key := fmt.Sprintf("user:%d:ema:%s", userId, eventType)
+	prevStr, err := rdb.Get(ctx, key).Result()
+
+	if err == redis.Nil {
+		if err := rdb.Set(ctx, key, current, 30*24*time.Hour).Err(); err != nil {
+			return 0, fmt.Errorf("Failed to set initial EMA: %w", err)
+		}
+		return current, nil
+	} else if err != nil {
+		return 0, fmt.Errorf("Could not get previous EMA: %w", err)
+	}
+
+	prevEMA, err := strconv.ParseFloat(prevStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("Invalid previous EMA value: %w", err)
+	}
+
+	newEma := alpha*current + (1-alpha)*prevEMA
+	if err := rdb.Set(ctx, key, newEma, 30*24*time.Hour).Err(); err != nil {
+		return 0, fmt.Errorf("Could not store new EMA: %w", err)
+	}
+
+	return newEma, nil
+}
+
+func updateEMAStdDev(rdb *redis.Client, userId int, eventType event.EventType, deviation, alpha float64) (float64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	key := fmt.Sprintf("user:%d:ema_std:%s", userId, eventType)
+	prevStr, err := rdb.Get(ctx, key).Result()
+
+	if err == redis.Nil {
+		rdb.Set(ctx, key, deviation, 30*24*time.Hour)
+		return deviation, nil
+	} else if err != nil {
+		return 0, fmt.Errorf("Could not get previous EMA stddev: %w", err)
+	}
+
+	prevStd, err := strconv.ParseFloat(prevStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("Invalid previous EMA stddev value: %w", err)
+	}
+
+	newStd := alpha*deviation + (1-alpha)*prevStd
+	if err := rdb.Set(ctx, key, newStd, 30*24*time.Hour).Err(); err != nil {
+		return 0, fmt.Errorf("Could not store new EMA stddev: %w", err)
+	}
+
+	return newStd, nil
 }

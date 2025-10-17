@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"math/rand/v2"
 	"sync"
@@ -29,6 +30,25 @@ func runRandomAnomaly(g *event.Generator, userID int) {
 	}
 }
 
+func runValidScenario(g *event.Generator, userId int) error {
+	scenarios := []func(int) error{
+		g.RunNormalUserScenario,
+		g.RunBrowseAndPurchaseScenario,
+		g.RunPaymentRetryScenario,
+		g.RunSubscriptionRenewalScenario,
+		g.RunProfileUpdateScenario,
+		g.RunLongShoppingSession,
+	}
+
+	selected := scenarios[rand.IntN(len(scenarios))]
+	err := selected(userId)
+	if err != nil {
+		return fmt.Errorf("Error running valid scenario: %w", err)
+	}
+
+	return nil
+}
+
 func simulateUsers(users []user.User, config *config.Config, generator *event.Generator, endTime time.Time, infinite bool) {
 	sem := make(chan struct{}, config.Flags.Concurrency)
 	var wg sync.WaitGroup
@@ -49,7 +69,7 @@ func simulateUsers(users []user.User, config *config.Config, generator *event.Ge
 					runRandomAnomaly(generator, u.ID)
 					log.Printf("Anomaly sent for user ID %d", u.ID)
 				} else {
-					if err := generator.RunNormalUserScenario(u.ID); err != nil {
+					if err := runValidScenario(generator, u.ID); err != nil {
 						log.Printf("Error running normal scenario for user %d: %v", u.ID, err)
 					}
 					log.Printf("Event sent for user ID %d", u.ID)
