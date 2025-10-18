@@ -1,2 +1,2 @@
 ALTER TABLE events
-ADD COLUMN session_id TEXT
+ADD COLUMN IF NOT EXISTS session_id TEXT

@@ -41,8 +41,9 @@ services:
       - "all"
       - "dev"
     volumes:
-      - ./analyser/db/schema:/migrations          
-    command: -source=file:///migrations -database postgres://postgres:postgres@db:5432/user_event_analysis_db?sslmode=disable up
+      - ./analyser/db/schema:/migrations
+    entrypoint: ["migrate"]
+    working_dir: /migrations
     depends_on:
       db:
         condition: service_healthy

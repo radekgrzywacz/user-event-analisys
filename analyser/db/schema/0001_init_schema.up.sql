@@ -13,6 +13,7 @@ CREATE TABLE events (
     user_agent TEXT,
     country TEXT,
     metadata JSONB,
+    additional JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
