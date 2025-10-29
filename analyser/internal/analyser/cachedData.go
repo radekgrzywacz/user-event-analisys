@@ -68,9 +68,14 @@ func recordTransition(e event.Event, rdb *redis.Client) error {
 	json.Unmarshal([]byte(events[2]), &prev2)
 
 	histogramKey := fmt.Sprintf("user:%d:transitions", cur.UserId)
-	transitionKey := fmt.Sprintf("%s->%s->%s", prev2.Type, prev1.Type, cur.Type)
-	rdb.HIncrBy(ctx, histogramKey, transitionKey, 1)
-	rdb.Expire(ctx, histogramKey, 7*24*time.Hour)
+	globalHistogramKey := "global:transitions"
+	firstOrderTransitionKey := fmt.Sprintf("%s->%s", prev1.Type, cur.Type)
+	rdb.HIncrBy(ctx, histogramKey, firstOrderTransitionKey, 1)
+	rdb.HIncrBy(ctx, globalHistogramKey, firstOrderTransitionKey, 1)
+
+	secondOrderTransitionKey := fmt.Sprintf("%s->%s->%s", prev2.Type, prev1.Type, cur.Type)
+	rdb.HIncrBy(ctx, histogramKey, secondOrderTransitionKey, 1)
+	rdb.HIncrBy(ctx, globalHistogramKey, secondOrderTransitionKey, 1)
 
 	return nil
 }
@@ -80,15 +85,15 @@ func analyseCached(event event.Event, rdb *redis.Client) (AnalyseResult, error) 
 		return result, nil
 	}
 
-	result, err := checkForValidEventTransition(event, rdb)
-	if err != nil {
-		return AnalyseResult{}, fmt.Errorf("Error checking event transition: %w", err)
-	}
-	if result.Anomaly {
-		return result, nil
-	}
+	// result, err := checkForValidEventTransition(event, rdb)
+	// if err != nil {
+	// 	return AnalyseResult{}, fmt.Errorf("Error checking event transition: %w", err)
+	// }
+	// if result.Anomaly {
+	// 	return result, nil
+	// }
 
-	result, err = checkMarkovAnomaly(event, rdb)
+	result, err := checkMarkovAnomaly(event, rdb)
 	if err != nil {
 		return AnalyseResult{}, fmt.Errorf("Error checking Markov anomaly: %w", err)
 	}
@@ -298,32 +303,111 @@ func checkForValidEventTransition(e event.Event, rdb *redis.Client) (AnalyseResu
 }
 
 func checkMarkovAnomaly(e event.Event, rdb *redis.Client) (AnalyseResult, error) {
+	prev1, prev2, err := getMarkovHistory(e, rdb)
+	if err != nil {
+		return AnalyseResult{}, err
+	}
+
+	userHistogramKey := fmt.Sprintf("user:%d:transitions", e.UserId)
+	const (
+		userBaseline   = "user history"
+		globalBaseline = "global history"
+	)
+
+	result, hasData, err := checkSecondOrderMarkovAnomaly(e, rdb, userHistogramKey, userBaseline, prev1, prev2)
+	if err != nil {
+		return AnalyseResult{}, err
+	}
+	if result.Anomaly {
+		return result, nil
+	}
+	if hasData {
+		return AnalyseResult{}, nil
+	}
+
+	result, hasData, err = checkFirstOrderMarkovAnomaly(e, rdb, userHistogramKey, userBaseline, prev1)
+	if err != nil {
+		return AnalyseResult{}, err
+	}
+	if result.Anomaly {
+		return result, nil
+	}
+	if hasData {
+		return AnalyseResult{}, nil
+	}
+
+	result, hasData, err = checkSecondOrderMarkovAnomaly(e, rdb, "global:transitions", globalBaseline, prev1, prev2)
+	if err != nil {
+		return AnalyseResult{}, err
+	}
+	if result.Anomaly {
+		return result, nil
+	}
+	if hasData {
+		return AnalyseResult{}, nil
+	}
+
+	result, _, err = checkFirstOrderMarkovAnomaly(e, rdb, "global:transitions", globalBaseline, prev1)
+	if err != nil {
+		return AnalyseResult{}, err
+	}
+	if result.Anomaly {
+		return result, nil
+	}
+
+	return AnalyseResult{}, nil
+}
+
+func getMarkovHistory(e event.Event, rdb *redis.Client) (*event.Event, *event.Event, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	key := fmt.Sprintf("user:%d", e.UserId)
-	events, err := rdb.ZRevRange(ctx, key, 0, 2).Result()
-	if err != nil || len(events) < 2 {
-		return AnalyseResult{}, nil
+	rawEvents, err := rdb.ZRevRange(ctx, key, 0, 1).Result()
+	if err != nil {
+		return nil, nil, fmt.Errorf("Could not retrieve recent events: %w", err)
 	}
 
-	var prev2, prev1 event.Event
-	json.Unmarshal([]byte(events[1]), &prev2)
-	json.Unmarshal([]byte(events[0]), &prev1)
+	if len(rawEvents) == 0 {
+		return nil, nil, nil
+	}
 
-	histogramKey := fmt.Sprintf("user:%d:transitions", e.UserId)
+	var prev1 event.Event
+	if err := json.Unmarshal([]byte(rawEvents[0]), &prev1); err != nil {
+		return nil, nil, fmt.Errorf("Could not unmarshal recent event: %w", err)
+	}
 
-	prefix := fmt.Sprintf("%s->%s->", prev2.Type, prev1.Type)
-	transition := fmt.Sprintf("%s->%s->%s", prev2.Type, prev1.Type, e.Type)
+	if len(rawEvents) == 1 {
+		return &prev1, nil, nil
+	}
+
+	var prev2 event.Event
+	if err := json.Unmarshal([]byte(rawEvents[1]), &prev2); err != nil {
+		return &prev1, nil, fmt.Errorf("Could not unmarshal second recent event: %w", err)
+	}
+
+	return &prev1, &prev2, nil
+}
+
+func checkFirstOrderMarkovAnomaly(e event.Event, rdb *redis.Client, histogramKey, baseline string, prev *event.Event) (AnalyseResult, bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if prev == nil {
+		return AnalyseResult{}, false, nil
+	}
+
+	prefix := fmt.Sprintf("%s->", prev.Type)
+	transition := fmt.Sprintf("%s->%s", prev.Type, e.Type)
 	allTransitions, err := rdb.HGetAll(ctx, histogramKey).Result()
 	if err != nil {
-		return AnalyseResult{}, fmt.Errorf("Could not fetch transition data: %w", err)
+		return AnalyseResult{}, false, fmt.Errorf("Could not fetch transition data: %w", err)
 	}
 
 	total := 0
 	count := 0
 	for k, v := range allTransitions {
-		if strings.HasPrefix(k, prefix) {
+		if strings.HasPrefix(k, prefix) && strings.Count(k, "->") == 1 {
 			c, _ := strconv.Atoi(v)
 			total += c
 			if k == transition {
@@ -334,7 +418,7 @@ func checkMarkovAnomaly(e event.Event, rdb *redis.Client) (AnalyseResult, error)
 
 	// < 20 to avoid false positive
 	if total < 20 {
-		return AnalyseResult{}, nil
+		return AnalyseResult{}, false, nil
 	}
 
 	probability := float64(count) / float64(total)
@@ -350,10 +434,70 @@ func checkMarkovAnomaly(e event.Event, rdb *redis.Client) (AnalyseResult, error)
 		return AnalyseResult{
 			Anomaly:     true,
 			AnomalyType: "markov_low_probability",
-			Message:     fmt.Sprintf("Unusual transition %s->%s->%s", prev2.Type, prev1.Type, e.Type),
+			Message:     formatMarkovMessage(fmt.Sprintf("Unusual transition %s->%s", prev.Type, e.Type), baseline),
 			Timestamp:   time.Now(),
-		}, nil
+		}, true, nil
 	}
 
-	return AnalyseResult{}, nil
+	return AnalyseResult{}, true, nil
+}
+
+func checkSecondOrderMarkovAnomaly(e event.Event, rdb *redis.Client, histogramKey, baseline string, prev1, prev2 *event.Event) (AnalyseResult, bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if prev1 == nil || prev2 == nil {
+		return AnalyseResult{}, false, nil
+	}
+
+	prefix := fmt.Sprintf("%s->%s->", prev2.Type, prev1.Type)
+	transition := fmt.Sprintf("%s->%s->%s", prev2.Type, prev1.Type, e.Type)
+	allTransitions, err := rdb.HGetAll(ctx, histogramKey).Result()
+	if err != nil {
+		return AnalyseResult{}, false, fmt.Errorf("Could not fetch transition data: %w", err)
+	}
+
+	total := 0
+	count := 0
+	for k, v := range allTransitions {
+		if strings.HasPrefix(k, prefix) && strings.Count(k, "->") == 2 {
+			c, _ := strconv.Atoi(v)
+			total += c
+			if k == transition {
+				count = c
+			}
+		}
+	}
+
+	// < 20 to avoid false positive
+	if total < 20 {
+		return AnalyseResult{}, false, nil
+	}
+
+	probability := float64(count) / float64(total)
+
+	threshold := math.Max(0.01, 1.0/math.Sqrt(float64(total)))
+	if total < 50 {
+		threshold = 0.02
+	} else if total > 200 {
+		threshold = 0.05
+	}
+
+	if probability < threshold {
+		return AnalyseResult{
+			Anomaly:     true,
+			AnomalyType: "markov_low_probability",
+			Message:     formatMarkovMessage(fmt.Sprintf("Unusual transition %s->%s->%s", prev2.Type, prev1.Type, e.Type), baseline),
+			Timestamp:   time.Now(),
+		}, true, nil
+	}
+
+	return AnalyseResult{}, true, nil
+}
+
+func formatMarkovMessage(base, baseline string) string {
+	if baseline == "" {
+		return base
+	}
+	return fmt.Sprintf("%s based on %s", base, baseline)
 }

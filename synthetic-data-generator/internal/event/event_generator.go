@@ -99,7 +99,6 @@ func (g *Generator) SendEvent(event Event) error {
 	if err != nil {
 		return fmt.Errorf("Could not marshal an event: %w", err)
 	}
-	fmt.Printf("%#v\n", event)
 
 	body := bytes.NewBuffer(e)
 	url := fmt.Sprintf("http://%s:%s/ingestor", env.GetEnvString("INGESTOR_URL", "http-ingestor"), env.GetEnvString("INGESTOR_PORT", "8081"))

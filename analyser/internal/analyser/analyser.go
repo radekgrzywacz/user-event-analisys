@@ -22,6 +22,8 @@ type AnalyseResult struct {
 // 3. Odległość geograficzna po IP
 // 4. Za duzo failed loginow
 
+// TODO: Poprawić uczenie sie markova, zeby zapobiegać data poisoning.
+
 func Process(event event.Event, rdb *redis.Client, pg *store.Queries) error {
 	result, err := analyseCached(event, rdb)
 	if err != nil {
