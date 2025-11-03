@@ -24,6 +24,8 @@ type AnalyseResult struct {
 
 // TODO: Poprawić uczenie sie markova, zeby zapobiegać data poisoning.
 
+// TODO: Dodać heartbeat do 'klienta' w celu tworzenia wykresu uptime serwisu
+
 func Process(event event.Event, rdb *redis.Client, pg *store.Queries) error {
 	result, err := analyseCached(event, rdb)
 	if err != nil {

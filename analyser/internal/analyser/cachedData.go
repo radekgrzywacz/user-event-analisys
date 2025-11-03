@@ -32,11 +32,9 @@ func addEventToRedis(event event.Event, rdb *redis.Client) error {
 		return fmt.Errorf("Failed to add event to redis: %w", err)
 	}
 
-	// Trzymaj tylko 3 dni eventów
 	rdb.ZRemRangeByScore(ctx, key, "0", fmt.Sprintf("%d", time.Now().Add(-72*time.Hour).Unix()))
 	rdb.Expire(ctx, key, 72*time.Hour)
 
-	// Dane pomocnicze — 14 dni
 	rdb.SAdd(ctx, fmt.Sprintf("user:%d:ips", event.UserId), event.Metadata.IP)
 	rdb.Expire(ctx, fmt.Sprintf("user:%d:ips", event.UserId), 14*24*time.Hour)
 
@@ -84,14 +82,6 @@ func analyseCached(event event.Event, rdb *redis.Client) (AnalyseResult, error) 
 	if result := checkStoredUserData(event, rdb); result.Anomaly {
 		return result, nil
 	}
-
-	// result, err := checkForValidEventTransition(event, rdb)
-	// if err != nil {
-	// 	return AnalyseResult{}, fmt.Errorf("Error checking event transition: %w", err)
-	// }
-	// if result.Anomaly {
-	// 	return result, nil
-	// }
 
 	result, err := checkMarkovAnomaly(event, rdb)
 	if err != nil {
@@ -251,54 +241,6 @@ func checkTimeDeviation(e event.Event, rdb *redis.Client) (AnalyseResult, error)
 		Anomaly:   false,
 		Message:   "",
 		Timestamp: time.Now(),
-	}, nil
-}
-
-func checkForValidEventTransition(e event.Event, rdb *redis.Client) (AnalyseResult, error) {
-	var allowedTransitions = map[event.EventType][]event.EventType{
-		event.EventLogin:         {event.EventPayment, event.EventLogout, event.EventFailedLogin},
-		event.EventPayment:       {event.EventLogout, event.EventOther},
-		event.EventLogout:        {event.EventLogin},
-		event.EventFailedLogin:   {event.EventLogin, event.EventPasswordReset},
-		event.EventPasswordReset: {event.EventLogin},
-		event.EventOther:         {event.EventLogout, event.EventLogin},
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	key := fmt.Sprintf("user:%d", e.UserId)
-	events, err := rdb.ZRevRange(ctx, key, 0, 0).Result()
-	if err != nil || len(events) == 0 {
-		return AnalyseResult{}, fmt.Errorf("Could not retrieve last events: %w", err)
-	}
-
-	var lastEvent event.Event
-	if err := json.Unmarshal([]byte(events[0]), &lastEvent); err != nil {
-		return AnalyseResult{}, nil
-	}
-
-	allowedNext, ok := allowedTransitions[lastEvent.Type]
-	if !ok {
-		return AnalyseResult{
-			Anomaly:     true,
-			AnomalyType: "unknown_transition_rule",
-			Message:     fmt.Sprintf("No transition rule form previous event type %s", lastEvent.Type),
-			Timestamp:   time.Now(),
-		}, nil
-	}
-
-	for _, next := range allowedNext {
-		if next == e.Type {
-			return AnalyseResult{}, nil
-		}
-	}
-
-	return AnalyseResult{
-		Anomaly:     true,
-		AnomalyType: "invalid_transition",
-		Message:     fmt.Sprintf("Disallowed transition: %s->%s", lastEvent.Type, e.Type),
-		Timestamp:   time.Now(),
 	}, nil
 }
 
