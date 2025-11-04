@@ -1,10 +1,16 @@
 MIGRATE_SYSTEM = docker compose run --rm migrate-system -path /migrations -database "postgres://postgres:postgres@db:5432/user_event_analysis_db?sslmode=disable"
 
-up:
+up-dev:
 	docker compose --profile dev up -d
 
-down:
+down-dev:
 	docker compose --profile dev down
+
+up-all:
+	docker compose --profile all up -d
+
+down-all:
+	docker compose --profile all down
 
 migrate-system-up:
 	$(MIGRATE_SYSTEM) up 1
