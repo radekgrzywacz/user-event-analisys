@@ -22,14 +22,21 @@ End-to-end platform for analyzing user behaviour in digital channels. Events are
 
 ### analyser (`analyser`)
 - Kafka consumer performing a two-stage analysis per event: fast cache checks (known IPs, Markov) followed by statistical heuristics (EMA, time deviation).
-- The central processing pipeline is `analyser/internal/analyser/analyser.go:29`.
-- Cache updates, Markov histograms, and statistical feature preparation happen in `analyser/internal/analyser/cachedData.go:16`.
-- EMA frequency deviation and hour-of-day heuristics are implemented in `analyser/internal/analyser/cachedData.go:131` and `analyser/internal/analyser/cachedData.go:215`.
-- Markov transition anomaly detection (1st- and 2nd-order, with global fallbacks) is located in `analyser/internal/analyser/cachedData.go:247`.
+- The central processing pipeline is `analyser/internal/domain/useractivity/processor.go:29`.
+- Cache updates, Markov histograms, and statistical feature preparation happen in `analyser/internal/domain/useractivity/cached_data.go:16`.
+- EMA frequency deviation and hour-of-day heuristics are implemented in `analyser/internal/domain/useractivity/cached_data.go:131` and `analyser/internal/domain/useractivity/cached_data.go:215`.
+- Markov transition anomaly detection (1st- and 2nd-order, with global fallbacks) is located in `analyser/internal/domain/useractivity/cached_data.go:247`.
 
 ### grafana (`grafana`)
 - Grafana instance with provisioned datasources and dashboards (`grafana/provisioning`), default credentials `admin/admin`.
 - The default dashboard (`grafana/provisioning/dashboards/default/events.json`) shows counts of events and anomalies from the analytical database.
+
+## Canonical event contract
+- All producers emit a shared envelope defined in `contracts/events/envelope.go:1` with explicit `spec_version`, `domain`, `event_type`, and correlation metadata.
+- Domain payload for user activity is described in `contracts/events/user_activity.go:1`; it normalises metadata (`ip`, `user_agent`, `country`) and additional attributes.
+- The synthetic generator adapts its internal structs to the canonical format via `synthetic-data-generator/internal/event/event_generator.go:105` and helper logic in `synthetic-data-generator/internal/adapters/contracts.go:7`.
+- The analyser validates and unwraps envelopes in `analyser/internal/event/event.go:9`, keeping Redis/Postgres writes isolated from producer-specific schemas.
+- To onboard a new source, implement an adapter that serialises domain events into the envelope and reuses the existing Kafka topic.
 
 ## Supporting components
 - PostgreSQL (`db`): generator database (`user_event_generator_db`) and analytical database (`user_event_analysis_db`). Creation script: `db/initdb/create_databases.sql`.
@@ -77,9 +84,9 @@ End-to-end platform for analyzing user behaviour in digital channels. Events are
 - `synthetic-data-generator/cmd/main/main.go:18` – scenario selection and concurrency control for the simulation.
 - `synthetic-data-generator/internal/event/scenarios_creator.go:10` – definitions of normal and anomalous scenarios (brute force, takeover, fraud, long sessions).
 - `http-ingestor/cmd/main/main.go:44` – HTTP handler that converts requests into Kafka records with timeout handling.
-- `analyser/internal/analyser/analyser.go:29` – main processing pipeline (cache → statistics → persistence).
-- `analyser/internal/analyser/cachedData.go:16` – user cache updates (72h history, IP/UA/country sets, Markov histograms).
-- `analyser/internal/analyser/cachedData.go:131` – EMA-based frequency deviation per event type.
-- `analyser/internal/analyser/cachedData.go:215` – unusual hour-of-day detection.
-- `analyser/internal/analyser/cachedData.go:247` – first/second-order Markov anomaly detection with global fallbacks.
+- `analyser/internal/domain/useractivity/processor.go:29` – main processing pipeline (cache → statistics → persistence).
+- `analyser/internal/domain/useractivity/cached_data.go:16` – user cache updates (72h history, IP/UA/country sets, Markov histograms).
+- `analyser/internal/domain/useractivity/cached_data.go:131` – EMA-based frequency deviation per event type.
+- `analyser/internal/domain/useractivity/cached_data.go:215` – unusual hour-of-day detection.
+- `analyser/internal/domain/useractivity/cached_data.go:247` – first/second-order Markov anomaly detection with global fallbacks.
 - `grafana/provisioning/dashboards/default/events.json:1` – prebuilt dashboard for monitoring event and anomaly counts.

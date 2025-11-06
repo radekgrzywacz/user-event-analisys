@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
+
+	contracts "user-event-analisys/contracts/events"
+
+	"synthetic-data-generator/internal/adapters"
 	"synthetic-data-generator/internal/env"
 	"synthetic-data-generator/internal/user"
-	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
 )
@@ -95,9 +99,23 @@ func (g *Generator) CreateRandomEvent(userId int, eventType EventType) (Event, e
 }
 
 func (g *Generator) SendEvent(event Event) error {
-	e, err := json.Marshal(event)
+	payload := contracts.UserActivityPayload{
+		UserID:     event.UserId,
+		Type:       contracts.ActivityType(event.Type),
+		Timestamp:  event.Timestamp,
+		SessionID:  event.SessionId,
+		Metadata:   contracts.UserMetadata(event.Metadata),
+		Additional: event.Additional,
+	}
+
+	envelope, err := adapters.UserActivityToEnvelope(payload, event.SessionId, nil)
 	if err != nil {
-		return fmt.Errorf("Could not marshal an event: %w", err)
+		return fmt.Errorf("could not build envelope: %w", err)
+	}
+
+	e, err := json.Marshal(envelope)
+	if err != nil {
+		return fmt.Errorf("could not marshal envelope: %w", err)
 	}
 
 	body := bytes.NewBuffer(e)
@@ -105,7 +123,7 @@ func (g *Generator) SendEvent(event Event) error {
 
 	resp, err := http.Post(url, "application/json; charset=utf-8", body)
 	if err != nil {
-		return fmt.Errorf("Could not send an event: %w", err)
+		return fmt.Errorf("could not send an event: %w", err)
 	}
 
 	defer resp.Body.Close()

@@ -8,6 +8,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/redis/go-redis/v9 v9.14.0
 	github.com/twmb/franz-go v1.19.5
+	user-event-analisys/contracts v0.0.0
 )
 
 require (
@@ -25,3 +26,5 @@ require (
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
 )
+
+replace user-event-analisys/contracts => ../contracts

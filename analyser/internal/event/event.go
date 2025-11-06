@@ -1,22 +1,27 @@
 package event
 
 import (
-	"encoding/json"
+	"fmt"
 	"time"
+
+	contracts "user-event-analisys/contracts/events"
 )
 
-type EventType string
+type EventType = contracts.ActivityType
 
 const (
-	EventLogin         EventType = "login"
-	EventPayment       EventType = "payment"
-	EventLogout        EventType = "logout"
-	EventFailedLogin   EventType = "failedLogin"
-	EventPasswordReset EventType = "passwordReset"
-	EventOther         EventType = "other"
+	EventLogin         EventType = contracts.ActivityLogin
+	EventPayment       EventType = contracts.ActivityPayment
+	EventLogout        EventType = contracts.ActivityLogout
+	EventFailedLogin   EventType = contracts.ActivityFailedLogin
+	EventPasswordReset EventType = contracts.ActivityPasswordReset
+	EventOther         EventType = contracts.ActivityOther
 )
 
+type Metadata = contracts.UserMetadata
+
 type Event struct {
+	Envelope   contracts.Envelope     `json:"envelope"`
 	UserId     int                    `json:"user_id"`
 	Type       EventType              `json:"type"`
 	Timestamp  time.Time              `json:"timestamp"`
@@ -25,29 +30,27 @@ type Event struct {
 	Additional map[string]interface{} `json:"additional"`
 }
 
-type Metadata struct {
-	IP        string `json:"ip"`
-	UserAgent string `json:"user_agent"`
-	Country   string `json:"country"`
-}
-
-func (m *Metadata) UnmarshallJSON(data []byte) error {
-	var v [3]string
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+func ParseEvent(envelope contracts.Envelope) (Event, error) {
+	if envelope.Domain != contracts.DomainUserActivity {
+		return Event{}, fmt.Errorf("unsupported domain: %s", envelope.Domain)
 	}
 
-	m.IP = v[0]
-	m.UserAgent = v[1]
-	m.Country = v[2]
-	return nil
-}
-
-func ParseEvent(e []byte) (Event, error) {
-	var event Event
-	if err := json.Unmarshal(e, &event); err != nil {
-		return Event{}, err
+	payload, err := envelope.UserActivityPayload()
+	if err != nil {
+		return Event{}, fmt.Errorf("decode user activity payload: %w", err)
 	}
 
-	return event, nil
+	if payload.Additional == nil {
+		payload.Additional = map[string]interface{}{}
+	}
+
+	return Event{
+		Envelope:   envelope,
+		UserId:     payload.UserID,
+		Type:       payload.Type,
+		Timestamp:  payload.Timestamp,
+		Metadata:   payload.Metadata,
+		SessionId:  payload.SessionID,
+		Additional: payload.Additional,
+	}, nil
 }

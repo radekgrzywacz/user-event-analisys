@@ -1,17 +1,23 @@
 package event
 
-import "time"
+import (
+	"time"
 
-type EventType string
+	contracts "user-event-analisys/contracts/events"
+)
+
+type EventType = contracts.ActivityType
 
 const (
-	EventLogin         EventType = "login"
-	EventPayment       EventType = "payment"
-	EventLogout        EventType = "logout"
-	EventFailedLogin   EventType = "failedLogin"
-	EventPasswordReset EventType = "passwordReset"
-	EventOther         EventType = "other"
+	EventLogin         EventType = contracts.ActivityLogin
+	EventPayment       EventType = contracts.ActivityPayment
+	EventLogout        EventType = contracts.ActivityLogout
+	EventFailedLogin   EventType = contracts.ActivityFailedLogin
+	EventPasswordReset EventType = contracts.ActivityPasswordReset
+	EventOther         EventType = contracts.ActivityOther
 )
+
+type Metadata = contracts.UserMetadata
 
 type Event struct {
 	UserId     int                    `json:"user_id"`
@@ -20,10 +26,4 @@ type Event struct {
 	SessionId  string                 `json:"session_id"`
 	Metadata   Metadata               `json:"metadata"`
 	Additional map[string]interface{} `json:"additional"`
-}
-
-type Metadata struct {
-	IP        string `json:"ip"`
-	UserAgent string `json:"user_agent"`
-	Country   string `json:"country"`
 }

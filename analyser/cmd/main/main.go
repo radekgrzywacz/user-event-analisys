@@ -1,16 +1,18 @@
 package main
 
 import (
-	"analyser/internal/analyser"
 	"analyser/internal/config"
-	"analyser/internal/event"
+	"analyser/internal/domain/useractivity"
+	"analyser/internal/processor"
 	"context"
+	"errors"
 	"log"
 	"os"
 	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/twmb/franz-go/pkg/kgo"
+	contracts "user-event-analisys/contracts/events"
 )
 
 func init() {
@@ -32,6 +34,9 @@ func main() {
 
 	ctx := context.Background()
 	commitChan := make(chan *kgo.Record, 1000)
+	registry := processor.NewRegistry(
+		useractivity.NewHandler(),
+	)
 
 	go commitLoop(ctx, config.Kafka, commitChan)
 
@@ -41,17 +46,20 @@ func main() {
 			for _, record := range p.Records {
 				record := record
 				go func() {
-					event, err := event.ParseEvent(record.Value)
+					envelope, err := contracts.ParseEnvelope(record.Value)
 					if err != nil {
-						log.Println("error parsing record")
+						log.Printf("error parsing envelope: %v", err)
 						return
 					}
-					err = analyser.Process(event, config.Redis, config.Pg)
-					if err != nil {
+					if err := registry.Handle(envelope, config.Redis, config.Pg); err != nil {
+						if errors.Is(err, processor.ErrUnknownDomain) {
+							log.Printf("skipping unsupported domain %q", envelope.Domain)
+							commitChan <- record
+							return
+						}
 						log.Printf("Processing error: %v", err)
 						return
 					}
-
 					commitChan <- record
 				}()
 			}
