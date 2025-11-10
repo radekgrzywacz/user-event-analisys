@@ -49,7 +49,9 @@ services:
         condition: service_healthy
 
   synthetic-data-generator:
-    build: ./synthetic-data-generator
+    build:
+      context: .
+      dockerfile: synthetic-data-generator/Dockerfile
     container_name: synthetic-data-generator
     profiles:
       - "all"
@@ -91,19 +93,21 @@ services:
         timeout: 3s
         retries: 5
   
-  analyser:
-    build: ./analyser
-    container_name: analyser
+  analyser-stat:
+    build:
+      context: .
+      dockerfile: analyser-stat/Dockerfile
+    container_name: analyser-stat
     profiles:
       - "all"
     ports: 
       - "8082:8082"
-    command: ["./analyser"]
+    command: ["./analyser-stat"]
     depends_on:
       - http-ingestor
     environment:
       KAFKA_URL: "kafka:29092" 
-      REDIS_URL: "redis"
+      REDIS_URL: "redis:6379"
       POSTGRES_URL: "postgres://postgres:postgres@db:5432/user_event_analysis_db?sslmode=disable"
       RUNNING_IN_DOCKER: "1"
       
@@ -155,7 +159,8 @@ services:
       kafka-topics --bootstrap-server kafka:29092 --list
 
       echo -e 'Creating kafka topics'
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic events --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic events --replication-factor 1 --partitions 2
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic analyser-result --replication-factor 1 --partitions 2
 
       echo -e 'Successfully created the following topics:'
       kafka-topics --bootstrap-server kafka:29092 --list

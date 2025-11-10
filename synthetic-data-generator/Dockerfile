@@ -1,17 +1,18 @@
 # Start from the official Golang image
 FROM golang:1.24.2
 
-# Set the working directory inside the container
 WORKDIR /app
 
 # Copy Go module files
-COPY go.mod go.sum ./
+COPY synthetic-data-generator/go.mod synthetic-data-generator/go.sum ./
+# Copy contracts module before downloading dependencies
+COPY contracts /contracts
 
 # Download dependencies
 RUN go mod download
 
 # Copy the full source code
-COPY . .
+COPY synthetic-data-generator/ ./
 
 # Build the Go app using the correct main file
 RUN go build -o synthetic-data-generator ./cmd/main
