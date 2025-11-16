@@ -1,20 +1,27 @@
-from src.data_loader import load_events
-from src.feature_engineering import preprocess
+from ml_core import preprocess, Autoencoder, save_artifacts
+from src.data_loader import load_data
 from src.trainer import train_autoencoder
-from utils import load_config
+import yaml
+from loguru import logger
+
+def load_config(path="./config.yml"):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
 
 def main():
     config = load_config()
-    print("Loading data from postgres...")
-    df = load_events()
 
-    print("Preprocessing...")
-    X = preprocess(df, config["training"]["model_dir"])
+    df = load_data(config["database"]["url"])
+    logger.info(f"Loaded {len(df)} events from database")
 
-    print("Training...")
-    train_autoencoder(X, config)
+    X, scaler = preprocess(df, fit=True, save_dir="../models")
+    logger.info(f"Preprocessed data shape: {X.shape}")
 
-    print("Training completed!")
+    model, metrics = train_autoencoder(X, config)
+    logger.success(f"Training finished. test_loss={metrics['test_loss']:.6f}")
+
+    save_artifacts(model, scaler, metrics, config["training"]["model_dir"])
+    logger.success("Model, scaler, and metrics saved successfully!")
 
 if __name__ == "__main__":
     main()

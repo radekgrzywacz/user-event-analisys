@@ -1,0 +1,8 @@
+torch==2.9.1
+numpy==2.3.4
+pandas==2.3.3
+scikit-learn==1.7.2
+quixstreams==3.23.0
+pyyaml==6.0.3
+loguru==0.7.3
+ml-core==0.1.0

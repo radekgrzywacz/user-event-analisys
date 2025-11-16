@@ -1,0 +1,10 @@
+kafka:
+  broker_address: "localhost:9092"
+  input_topic: "events"
+  output_topic: "ml_out"
+  consumer_group: "analyser-ml"
+
+model:
+  model_path: "../models/model.pt"
+  scaler_path: "../models/scaler.pkl"
+  metrics_path: "../models/metrics.pt"

@@ -15,3 +15,5 @@ tqdm==4.67.1
 
 # === Optional (for development & notebooks) ===
 ipython==9.7.0
+
+-e ../ml-core
