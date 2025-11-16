@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	WorkerCount   = 20   // liczba gorutyn przetwarzających rekordy
-	JobBufferSize = 1000 // bufor kanału dla rekordów
+	CommitInterval = 3 * time.Second
+	JobBufferSize  = 1000
 )
 
 func init() {
@@ -31,83 +31,56 @@ func init() {
 }
 
 func main() {
-	config, err := config.SetupConfig()
+	cfg, err := config.SetupConfig()
 	if err != nil {
 		log.Panic(err)
 	}
-	defer config.Kafka.Close()
-	defer config.Redis.Close()
+	defer cfg.Kafka.Close()
+	defer cfg.Redis.Close()
 
 	ctx := context.Background()
-	jobs := make(chan *kgo.Record, JobBufferSize)
-	commitChan := make(chan *kgo.Record, JobBufferSize)
 
-	producer := processor.NewProducer(config.Kafka, "analyser-result")
+	commitChan := make(chan *kgo.Record, JobBufferSize)
+	producer := processor.NewProducer(cfg.Kafka, "analyser-result")
 
 	registry := processor.NewRegistry(
 		useractivity.NewHandler(),
 	)
 
-	for i := range WorkerCount {
-		go worker(ctx, i, jobs, commitChan, registry, producer, config)
-	}
+	go commitLoop(ctx, cfg.Kafka, commitChan)
 
-	go commitLoop(ctx, config.Kafka, commitChan)
-
-	log.Printf("Analyser started with %d workers", WorkerCount)
+	log.Println("Analyser-Stat started (sequential mode, Kafka keyed by user_id)")
 
 	for {
-		fetches := config.Kafka.PollFetches(ctx)
+		fetches := cfg.Kafka.PollFetches(ctx)
 		fetches.EachPartition(func(p kgo.FetchTopicPartition) {
 			for _, record := range p.Records {
-				select {
-				case jobs <- record:
-					// record passed to worker
-				case <-ctx.Done():
-					return
-				default:
-					log.Printf("Job channel full, dropping record (topic=%s, partition=%d)", p.Topic, p.Partition)
+				envelope, err := contracts.ParseEnvelope(record.Value)
+				if err != nil {
+					log.Printf("error parsing envelope: %v", err)
+					continue
 				}
+
+				if err := registry.Handle(envelope, cfg.Redis, producer); err != nil {
+					if errors.Is(err, processor.ErrUnknownDomain) {
+						log.Printf("skipping unsupported domain %q", envelope.Domain)
+						commitChan <- record
+						continue
+					}
+					log.Printf("Processing error: %v", err)
+					continue
+				}
+
+				// Record processed successfully — mark for commit
+				commitChan <- record
 			}
 		})
 	}
 }
 
-func worker(ctx context.Context, id int, jobs <-chan *kgo.Record, commitChan chan<- *kgo.Record, registry *processor.Registry, producer *processor.Producer, cfg *config.Config) {
-	for {
-		select {
-		case <-ctx.Done():
-			log.Printf("[worker %d] stopping", id)
-			return
-		case record := <-jobs:
-			if record == nil {
-				continue
-			}
-
-			envelope, err := contracts.ParseEnvelope(record.Value)
-			if err != nil {
-				log.Printf("[worker %d] error parsing envelope: %v", id, err)
-				continue
-			}
-
-			if err := registry.Handle(envelope, cfg.Redis, producer); err != nil {
-				if errors.Is(err, processor.ErrUnknownDomain) {
-					log.Printf("[worker %d] skipping unsupported domain %q", id, envelope.Domain)
-					commitChan <- record
-					continue
-				}
-				log.Printf("[worker %d] processing error: %v", id, err)
-				continue
-			}
-
-			commitChan <- record
-		}
-	}
-}
-
 func commitLoop(ctx context.Context, client *kgo.Client, commitChan chan *kgo.Record) {
 	var toCommit []*kgo.Record
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(CommitInterval)
 	defer ticker.Stop()
 
 	for {

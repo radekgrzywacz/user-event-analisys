@@ -1,0 +1,15 @@
+database:
+  host: localhost
+  port: 5432
+  name: user_event_analysis_db
+  user: postgres
+  password: postgres
+
+training:
+  epochs: 10
+  batch_size: 256
+  learning_rate: 0.001
+  embedding_dim: 8
+  hidden_dim: 32
+  test_split: 0.2
+  model_dir: ./saved

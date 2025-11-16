@@ -1,2 +1,7 @@
 ### MacOS ###
 **/.DS_Store
+
+### Python ###
+ml-trainer/__pycache__
+ml-trainer/src/__pycache__
+ml-trainer/.venv

@@ -1,0 +1,17 @@
+# === Core ML stack ===
+torch==2.9.1
+numpy==2.3.4
+pandas==2.3.3
+scikit-learn==1.7.2
+
+# === Database access (PostgreSQL) ===
+SQLAlchemy==2.0.44
+psycopg2-binary==2.9.11
+
+# === Config & utilities ===
+pyyaml==6.0.3
+loguru==0.7.3
+tqdm==4.67.1
+
+# === Optional (for development & notebooks) ===
+ipython==9.7.0
