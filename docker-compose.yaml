@@ -63,13 +63,8 @@ services:
         condition: service_healthy
       migrate-generator: 
         condition: service_completed_successfully
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: postgres 
-      DB_PASSWORD: postgres 
-      DB_NAME: user_event_generator_db
-      INGESTOR_URL: http-ingestor
+    env_file:
+      - ./synthetic-data-generator/.env.docker
     ports:
       - "8080:8080"
     command: ["./synthetic-data-generator", "-duration", "0", "-concurrency", "2", "-users", "10"]
@@ -83,10 +78,8 @@ services:
     ports:
       - "8081:8081"
     command: ["./http-ingestor"]
-    environment:
-      KAFKA_URL: "kafka:29092"
-      SOURCE: docker
-      RUNNING_IN_DOCKER: "1"
+    env_file:
+      - ./http-ingestor/.env.docker
     healthcheck:
         test: ["CMD", "curl", "-f", "http://localhost:8081/healthcheck"]
         interval: 5s
@@ -105,11 +98,57 @@ services:
     command: ["./analyser-stat"]
     depends_on:
       - http-ingestor
+    env_file:
+      - ./analyser-stat/.env.docker
+
+  analyser-ml:
+    build:
+      context: .
+      dockerfile: analyser-ml/Dockerfile
+    container_name: analyser-ml
+    profiles:
+      - "all"
+      - "dev"
+    depends_on:
+      kafka:
+        condition: service_started
+      init-kafka:
+        condition: service_completed_successfully
     environment:
-      KAFKA_URL: "kafka:29092" 
-      REDIS_URL: "redis:6379"
-      POSTGRES_URL: "postgres://postgres:postgres@db:5432/user_event_analysis_db?sslmode=disable"
       RUNNING_IN_DOCKER: "1"
+      KAFKA_BROKER_ADDRESS: "kafka:29092"
+      KAFKA_INPUT_TOPIC: "events"
+      KAFKA_OUTPUT_TOPIC: "ml_out"
+      KAFKA_CONSUMER_GROUP: "analyser-ml"
+      MODEL_PATH: "/models/model.pt"
+      SCALER_PATH: "/models/scaler.pkl"
+      METRICS_PATH: "/models/metrics.pt"
+      STATE_DIR: "/state"
+    volumes:
+      - ./models:/models
+      - ./analyser-ml/state:/state
+
+  ml-trainer:
+    build:
+      context: .
+      dockerfile: ml-trainer/Dockerfile
+    container_name: ml-trainer
+    profiles:
+      - "all"
+      - "dev"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      RUNNING_IN_DOCKER: "1"
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/user_event_analysis_db"
+      MODEL_DIR: "/models"
+      TRAINING_STATE_PATH: "/models/training_state.json"
+      RETRAIN_MIN_NEW_EVENTS: 2000
+      RETRAIN_POLL_INTERVAL_SECONDS: 120
+      RETRAIN_MAX_HOURS_BETWEEN_RETRAINS: 6
+    volumes:
+      - ./models:/models
       
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
@@ -160,7 +199,8 @@ services:
 
       echo -e 'Creating kafka topics'
       kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic events --replication-factor 1 --partitions 2
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic analyser-result --replication-factor 1 --partitions 2
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic stat_out --replication-factor 1 --partitions 2
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic ml_out --replication-factor 1 --partitions 2
 
       echo -e 'Successfully created the following topics:'
       kafka-topics --bootstrap-server kafka:29092 --list

@@ -6,8 +6,8 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 COPY ml-core /ml-core
-COPY ml-trainer /app
+COPY analyser-ml /app
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python", "retrainer.py"]
+CMD ["python", "main.py"]

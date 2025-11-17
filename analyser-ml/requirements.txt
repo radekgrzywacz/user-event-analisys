@@ -5,4 +5,5 @@ scikit-learn==1.7.2
 quixstreams==3.23.0
 pyyaml==6.0.3
 loguru==0.7.3
-ml-core==0.1.0
+python-dotenv==1.0.1
+-e ../ml-core

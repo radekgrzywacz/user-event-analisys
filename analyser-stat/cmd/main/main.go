@@ -41,7 +41,7 @@ func main() {
 	ctx := context.Background()
 
 	commitChan := make(chan *kgo.Record, JobBufferSize)
-	producer := processor.NewProducer(cfg.Kafka, "analyser-result")
+	producer := processor.NewProducer(cfg.Kafka, "stat_out")
 
 	registry := processor.NewRegistry(
 		useractivity.NewHandler(),

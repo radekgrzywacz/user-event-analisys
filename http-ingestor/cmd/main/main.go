@@ -20,6 +20,7 @@ import (
 
 type App struct {
 	client *kgo.Client
+	topic  string
 }
 
 // Getting proper env - docker or .env
@@ -32,15 +33,16 @@ func init() {
 	}
 }
 
-func setupKafka() (*kgo.Client, error) {
-	kafka := env.GetEnvString("KAFKA_URL", "asd")
+func setupKafka() (*kgo.Client, string, error) {
+	kafka := env.GetEnvString("KAFKA_URL", "localhost:9092")
+	topic := env.GetEnvString("EVENTS_TOPIC", "events")
 	cl, err := kgo.NewClient(kgo.SeedBrokers(kafka),
-		kgo.DefaultProduceTopic("events"))
+		kgo.DefaultProduceTopic(topic))
 	if err != nil {
-		return nil, fmt.Errorf("Could not create a kafka client: %d", err)
+		return nil, "", fmt.Errorf("Could not create a kafka client: %v", err)
 	}
 
-	return cl, nil
+	return cl, topic, nil
 }
 
 func (app *App) getDataForKafka(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +74,7 @@ func (app *App) getDataForKafka(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	app.client.Produce(ctx, &kgo.Record{
-		Topic: "events",
+		Topic: app.topic,
 		Key:   []byte(key),
 		Value: body,
 	}, func(_ *kgo.Record, err error) {
@@ -115,18 +117,20 @@ var partitionKeyResolvers = map[string]func(contracts.Envelope) (string, error){
 }
 
 func main() {
-	client, err := setupKafka()
+	client, topic, err := setupKafka()
 	if err != nil {
 		log.Fatalf("Error creating kafka client: %v", err)
 	}
 
-	app := App{client}
+	app := App{client: client, topic: topic}
 
 	http.HandleFunc("/ingestor", app.getDataForKafka)
 	http.HandleFunc("/healthcheck", healthcheck)
 
-	log.Print("Ingestor server starting...")
-	err = http.ListenAndServe(":8081", nil)
+	port := env.GetEnvString("HTTP_PORT", "8081")
+
+	log.Printf("Ingestor server starting on :%s...", port)
+	err = http.ListenAndServe(":"+port, nil)
 	if errors.Is(err, http.ErrServerClosed) {
 		fmt.Printf("server closed\n")
 	} else if err != nil {

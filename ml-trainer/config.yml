@@ -9,3 +9,9 @@ training:
   hidden_dim: 32
   test_split: 0.2
   model_dir: ../models
+
+retraining:
+  min_new_events: 2000
+  poll_interval_seconds: 120
+  max_hours_between_retrains: 6
+  state_path: ../models/training_state.json

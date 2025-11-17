@@ -16,10 +16,12 @@ type Config struct {
 
 func setupKafka() (*kgo.Client, error) {
 	broker := env.GetEnvString("KAFKA_URL", "localhost:9092")
+	topic := env.GetEnvString("KAFKA_TOPIC", "events")
+	group := env.GetEnvString("KAFKA_CONSUMER_GROUP", "analyser-stat")
 
 	cl, err := kgo.NewClient(kgo.SeedBrokers(broker),
-		kgo.ConsumeTopics("events"),
-		kgo.ConsumerGroup("analyser-stat"),
+		kgo.ConsumeTopics(topic),
+		kgo.ConsumerGroup(group),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create consumer client: %v", err)

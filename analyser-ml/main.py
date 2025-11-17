@@ -1,32 +1,70 @@
 import json
-import torch
+import os
 import pickle
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Dict
+
 import numpy as np
 import pandas as pd
-from loguru import logger
-from collections import defaultdict
-from quixstreams import Application
-from ml_core import Autoencoder
+import torch
 import yaml
+from dotenv import load_dotenv
+from loguru import logger
+from quixstreams import Application
 
-# === Konfiguracja ===
-with open("config.yml", "r") as f:
-    config = yaml.safe_load(f)
+from ml_core import Autoencoder
+
+BASE_DIR = Path(__file__).resolve().parent
+ENV_PATH = BASE_DIR / ".env"
+
+if not os.getenv("RUNNING_IN_DOCKER") and ENV_PATH.exists():
+    load_dotenv(dotenv_path=ENV_PATH, override=False)
+
+
+def load_app_config(path: Path) -> Dict[str, Any]:
+    with open(path, "r") as f:
+        config = yaml.safe_load(f)
+
+    kafka_cfg = config.setdefault("kafka", {})
+    kafka_cfg["broker_address"] = os.getenv("KAFKA_BROKER_ADDRESS", kafka_cfg.get("broker_address"))
+    kafka_cfg["input_topic"] = os.getenv("KAFKA_INPUT_TOPIC", kafka_cfg.get("input_topic"))
+    kafka_cfg["output_topic"] = os.getenv("KAFKA_OUTPUT_TOPIC", kafka_cfg.get("output_topic"))
+    kafka_cfg["consumer_group"] = os.getenv("KAFKA_CONSUMER_GROUP", kafka_cfg.get("consumer_group"))
+
+    model_cfg = config.setdefault("model", {})
+    model_cfg["model_path"] = os.getenv("MODEL_PATH", model_cfg.get("model_path"))
+    model_cfg["scaler_path"] = os.getenv("SCALER_PATH", model_cfg.get("scaler_path"))
+    model_cfg["metrics_path"] = os.getenv("METRICS_PATH", model_cfg.get("metrics_path"))
+    model_cfg["input_dim"] = int(os.getenv("MODEL_INPUT_DIM", model_cfg.get("input_dim", 8)))
+    model_cfg["hidden_dim"] = int(os.getenv("MODEL_HIDDEN_DIM", model_cfg.get("hidden_dim", 32)))
+    model_cfg["threshold_multiplier"] = float(
+        os.getenv("THRESHOLD_MULTIPLIER", model_cfg.get("threshold_multiplier", 10.0))
+    )
+
+    state_default = config.get("state_dir", BASE_DIR / "state" / kafka_cfg["consumer_group"])
+    config["state_dir"] = os.getenv("STATE_DIR", str(state_default))
+    return config
+
+
+config = load_app_config(BASE_DIR / "config.yml")
+Path(config["state_dir"]).mkdir(parents=True, exist_ok=True)
 
 logger.info("Loading model and scaler...")
 
 # Wczytanie modelu
-model = Autoencoder(input_dim=8, hidden_dim=32)
-model.load_state_dict(torch.load(config["model"]["model_path"], map_location="cpu"))
+model_cfg = config["model"]
+model = Autoencoder(input_dim=model_cfg["input_dim"], hidden_dim=model_cfg["hidden_dim"])
+model.load_state_dict(torch.load(model_cfg["model_path"], map_location="cpu"))
 model.eval()
 
 # Wczytanie scalera
-with open(config["model"]["scaler_path"], "rb") as f:
+with open(model_cfg["scaler_path"], "rb") as f:
     scaler = pickle.load(f)
 
 # Wczytanie metryk
-metrics = torch.load(config["model"]["metrics_path"], weights_only=False)
-threshold = float(metrics["threshold"]) * 10
+metrics = torch.load(model_cfg["metrics_path"], weights_only=False)
+threshold = float(metrics["threshold"]) * model_cfg["threshold_multiplier"]
 
 logger.success("Model and scaler loaded successfully!")
 
@@ -34,7 +72,8 @@ logger.success("Model and scaler loaded successfully!")
 app = Application(
     broker_address=config["kafka"]["broker_address"],
     consumer_group=config["kafka"]["consumer_group"],
-    auto_offset_reset="latest"
+    auto_offset_reset="latest",
+    state_dir=config["state_dir"],
 )
 
 input_topic = app.topic(config["kafka"]["input_topic"], value_deserializer="json")

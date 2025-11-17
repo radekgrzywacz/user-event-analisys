@@ -11,6 +11,7 @@ psycopg2-binary==2.9.11
 # === Config & utilities ===
 pyyaml==6.0.3
 loguru==0.7.3
+python-dotenv==1.0.1
 tqdm==4.67.1
 
 # === Optional (for development & notebooks) ===

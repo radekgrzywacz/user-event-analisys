@@ -3,6 +3,7 @@ package config
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"synthetic-data-generator/internal/db"
 	"synthetic-data-generator/internal/env"
@@ -10,7 +11,7 @@ import (
 
 type Config struct {
 	Flags Flags
-	DB   *sql.DB
+	DB    *sql.DB
 }
 
 type Flags struct {
@@ -36,11 +37,18 @@ func SetupConfig() Config {
 func parseFlags() Flags {
 	var flags Flags
 
+	defaultEndpoint := env.GetEnvString("INGESTOR_API_URL", "")
+	if defaultEndpoint == "" {
+		host := env.GetEnvString("INGESTOR_URL", "localhost")
+		port := env.GetEnvString("INGESTOR_PORT", "8081")
+		defaultEndpoint = fmt.Sprintf("http://%s:%s/ingestor", host, port)
+	}
+
 	flag.IntVar(&flags.UsersCount, "users", 20, "Number of users to simulate")
 	flag.IntVar(&flags.DurationInSeconds, "duration", 120, "Duration of the simulation in seconds")
 	flag.IntVar(&flags.Concurrency, "concurrency", 5, "Number of concurrent simulated events")
 	flag.Float64Var(&flags.AnomalyRate, "anomaly-rate", 0.2, "Fraction of events that are anomalies (0.0 - 1.0)")
-	flag.StringVar(&flags.Endpoint, "endpoint", env.GetEnvString("INGESTOR_API_URL", "http://localhost:8080/events"), "API endpoint to send events to")
+	flag.StringVar(&flags.Endpoint, "endpoint", defaultEndpoint, "API endpoint to send events to")
 
 	flag.Parse()
 
