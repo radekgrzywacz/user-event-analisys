@@ -5,3 +5,8 @@
 ml-trainer/__pycache__
 ml-trainer/src/__pycache__
 ml-trainer/.venv
+ml-core/ml_core.egg-info
+ml-core/ml_core/__pycache__
+
+### VS Code ###
+.vscode
