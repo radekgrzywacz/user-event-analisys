@@ -1,0 +1,3 @@
+DROP IF EXISTS TABLE raw_events;
+
+DROP IF EXISTS TABLE users;

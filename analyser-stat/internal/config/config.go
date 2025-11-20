@@ -38,18 +38,6 @@ func setupRedis() *redis.Client {
 	})
 }
 
-// func setupPostgres() (*store.Queries, error) {
-// 	url := env.GetEnvString("POSTGRES_URL", "postgres://postgres:postgres@localhost:5432/user_event_analysis_db?sslmode=disable")
-// 	dsn := env.GetEnvString("POSTGRES_DSN", url)
-
-// 	pool, err := pgxpool.New(context.Background(), dsn)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("unable to connect to PostgreSQL: %w", err)
-// 	}
-
-// 	return store.New(pool), nil
-// }
-
 func SetupConfig() (*Config, error) {
 	kafka, err := setupKafka()
 	if err != nil {

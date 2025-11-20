@@ -1,5 +1,5 @@
 -- name: InsertEvent :one
-INSERT INTO events (
+INSERT INTO raw_events (
     user_id,
     event_type,
     timestamp,
@@ -23,7 +23,7 @@ SELECT id,
        metadata,
        created_at,
        session_id
-FROM events
+FROM raw_events
 WHERE id = $1;
 
 -- name: GetEventsByUser :many
@@ -37,7 +37,7 @@ SELECT id,
        metadata,
        created_at,
        session_id
-FROM events
+FROM raw_events
 WHERE user_id = $1
 ORDER BY timestamp DESC
 LIMIT $2;
@@ -53,10 +53,10 @@ SELECT id,
        metadata,
        created_at
        session_id
-FROM events
+FROM raw_events
 ORDER BY timestamp DESC
 LIMIT $1;
 
 -- name: DeleteOldEvents :exec
-DELETE FROM events
+DELETE FROM raw_events
 WHERE timestamp < NOW() - INTERVAL '7 days';
