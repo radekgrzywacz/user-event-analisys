@@ -94,7 +94,11 @@ def process_event(event: dict):
 
         session_id = payload.get("session_id") or correlation.get("session_id")
         user_id = payload.get("user_id")
-        timestamp = payload.get("timestamp") or event.get("timestamp")
+        timestamp = (
+            payload.get("timestamp")
+            or event.get("timestamp")
+            or pd.Timestamp.utcnow().isoformat()
+        )
 
         # Brak podstawowych danych? Pomijamy event
         if not session_id or not user_id:

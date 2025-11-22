@@ -63,6 +63,7 @@ func (c *MLConsumer) insertMLResult(payload events.MLResult) error {
 		Anomaly:    payload.Anomaly,
 		Score:      pgtype.Float8{Float64: payload.Score, Valid: true},
 		Threshold:  pgtype.Float8{Float64: payload.Threshold, Valid: true},
+		Timestamp:  pgtype.Timestamptz{Time: payload.Timestamp.UTC(), Valid: true},
 		EventCount: pgtype.Int4{Int32: int32(payload.EventCount), Valid: true},
 	})
 	log.Println("Inserted ml")

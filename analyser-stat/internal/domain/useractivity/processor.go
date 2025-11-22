@@ -46,7 +46,7 @@ func Process(event event.Event, rdb *redis.Client, producer *processor.Producer)
 			Anomaly:     true,
 			AnomalyType: result.AnomalyType,
 			Message:     result.Message,
-			Timestamp:   time.Now().String(),
+			Timestamp:   time.Now().UTC().Format(time.RFC3339Nano),
 			Source:      "stat",
 		})
 		log.Printf("Result produced")
@@ -69,7 +69,7 @@ func Process(event event.Event, rdb *redis.Client, producer *processor.Producer)
 			Anomaly:     true,
 			AnomalyType: result.AnomalyType,
 			Message:     result.Message,
-			Timestamp:   time.Now().String(),
+			Timestamp:   time.Now().UTC().Format(time.RFC3339Nano),
 			Source:      "stat",
 		})
 		return nil
@@ -85,7 +85,7 @@ func Process(event event.Event, rdb *redis.Client, producer *processor.Producer)
 		Anomaly:     false,
 		AnomalyType: "",
 		Message:     "No anomaly deteceted",
-		Timestamp:   time.Now().String(),
+		Timestamp:   time.Now().UTC().Format(time.RFC3339Nano),
 		Source:      "stat",
 	})
 	return nil

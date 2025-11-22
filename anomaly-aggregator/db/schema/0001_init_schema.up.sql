@@ -1,15 +1,7 @@
 CREATE TABLE
-    IF NOT EXISTS users (
-        id serial4 NOT NULL,
-        created_at timestamptz DEFAULT now () NULL,
-        last_seen timestamptz NULL,
-        CONSTRAINT users_pkey PRIMARY KEY (id)
-    );
-
-CREATE TABLE
     IF NOT EXISTS raw_events (
         id bigserial PRIMARY KEY,
-        user_id int NOT NULL REFERENCES users (id),
+        user_id int NOT NULL,
         event_type text NOT NULL,
         "timestamp" timestamptz NOT NULL,
         ip text NULL,
@@ -70,3 +62,11 @@ CREATE INDEX IF NOT EXISTS idx_ml_results_session ON ml_results (session_id);
 CREATE INDEX IF NOT EXISTS idx_stat_results_session ON stat_results (session_id);
 
 CREATE INDEX IF NOT EXISTS idx_aggregated_results_user ON aggregated_results (user_id);
+
+CREATE INDEX IF NOT EXISTS idx_raw_events_timestamp ON raw_events ("timestamp");
+
+CREATE INDEX IF NOT EXISTS idx_agg_results_created_at ON aggregated_results (created_at);
+
+CREATE INDEX IF NOT EXISTS idx_ml_results_timestamp ON ml_results (timestamp);
+
+CREATE INDEX IF NOT EXISTS idx_stat_results_timestamp ON stat_results (timestamp);
