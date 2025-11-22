@@ -8,6 +8,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AggregatedResult struct {
+	ID           int32
+	SessionID    string
+	UserID       int32
+	MlAnomaly    pgtype.Bool
+	MlScore      pgtype.Float8
+	MlThreshold  pgtype.Float8
+	StatAnomaly  pgtype.Bool
+	AnomalyType  pgtype.Text
+	EventCount   pgtype.Int4
+	UniqueEvents pgtype.Int4
+	CreatedAt    pgtype.Timestamptz
+}
+
+type MlResult struct {
+	ID           int32
+	UserID       int32
+	SessionID    string
+	Timestamp    pgtype.Timestamptz
+	Anomaly      bool
+	Score        pgtype.Float8
+	Threshold    pgtype.Float8
+	EventCount   pgtype.Int4
+	UniqueEvents pgtype.Int4
+	Source       pgtype.Text
+	CreatedAt    pgtype.Timestamptz
+}
+
 type RawEvent struct {
 	ID         int64
 	UserID     int32
@@ -20,6 +48,19 @@ type RawEvent struct {
 	Additional []byte
 	CreatedAt  pgtype.Timestamptz
 	SessionID  pgtype.Text
+}
+
+type StatResult struct {
+	ID          int32
+	UserID      int32
+	SessionID   string
+	EventType   pgtype.Text
+	Anomaly     bool
+	AnomalyType pgtype.Text
+	Message     pgtype.Text
+	Timestamp   pgtype.Timestamptz
+	Source      pgtype.Text
+	CreatedAt   pgtype.Timestamptz
 }
 
 type User struct {

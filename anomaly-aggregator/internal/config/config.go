@@ -42,23 +42,24 @@ func setupKafka(broker, topic, group string) (*kgo.Client, error) {
 
 func SetupConfig() (Config, error) {
 	broker := env.GetEnvString("KAFKA_URL", "localhost:9092")
-	topic := env.GetEnvString("KAFKA_TOPIC_STAT", "stat_out")
 	group := env.GetEnvString("KAFKA_CONSUMER_GROUP", "aggregator")
-	stat, err := setupKafka(broker, topic, group)
+
+	statTopic := env.GetEnvString("KAFKA_TOPIC_STAT", "stat_out")
+	stat, err := setupKafka(broker, statTopic, group)
 	if err != nil {
 		return Config{}, fmt.Errorf("Could not set up Kafka Stat consumer: %w", err)
 	}
 
-	topic = env.GetEnvString("KAFKA_TOPIC_STAT", "ml_out")
-	ml, err := setupKafka(broker, topic, group)
+	mlTopic := env.GetEnvString("KAFKA_TOPIC_ML", "ml_out")
+	ml, err := setupKafka(broker, mlTopic, group)
 	if err != nil {
 		return Config{}, fmt.Errorf("Could not set up Kafka Ml consumer: %w", err)
 	}
 
-	topic = env.GetEnvString("KAFKA_TOPIC_STAT", "events")
-	raw, err := setupKafka(broker, topic, group)
+	rawTopic := env.GetEnvString("KAFKA_TOPIC_EVENTS", "events")
+	raw, err := setupKafka(broker, rawTopic, group)
 	if err != nil {
-		return Config{}, fmt.Errorf("Could not set up Kafka Ml consumer: %w", err)
+		return Config{}, fmt.Errorf("Could not set up Kafka Raw consumer: %w", err)
 	}
 
 	pg, err := setupPostgres()
@@ -66,5 +67,10 @@ func SetupConfig() (Config, error) {
 		return Config{}, fmt.Errorf("Could not set up Postgres: %w", err)
 	}
 
-	return Config{stat, ml, raw, pg}, nil
+	return Config{
+		KafkaStat: stat,
+		KafkaMl:   ml,
+		KafkaRaw:  raw,
+		Pg:        pg,
+	}, nil
 }

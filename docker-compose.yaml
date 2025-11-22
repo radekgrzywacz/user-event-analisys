@@ -42,8 +42,11 @@ services:
       - "dev"
     volumes:
       - ./anomaly-aggregator/db/schema:/migrations
-    entrypoint: ["migrate"]
-    working_dir: /migrations
+    command: [
+      "-path=/migrations",
+      "-database=postgres://postgres:postgres@db:5432/user_event_analysis_db?sslmode=disable",
+      "up"
+    ]
     depends_on:
       db:
         condition: service_healthy
@@ -70,7 +73,9 @@ services:
     command: ["./synthetic-data-generator", "-duration", "0", "-concurrency", "2", "-users", "10"]
     
   http-ingestor:
-    build: ./http-ingestor
+    build: 
+      context: .
+      dockerfile: http-ingestor/Dockerfile
     container_name: http-ingestor
     profiles:
       - "all"
@@ -128,6 +133,26 @@ services:
       - ./models:/models
       - ./analyser-ml/state:/state
 
+  anomaly-aggregator:
+    build:
+      context: .
+      dockerfile: anomaly-aggregator/Dockerfile
+    container_name: anomaly-aggregator
+    profiles:
+      - "all"
+      - "dev"
+    depends_on:
+      kafka:
+        condition: service_started
+      init-kafka:
+        condition: service_completed_successfully
+      analyser-ml:
+        condition: service_started
+      analyser-stat:
+        condition: service_started
+    env_file:
+      - ./anomaly-aggregator/.env.docker
+    
   ml-trainer:
     build:
       context: .

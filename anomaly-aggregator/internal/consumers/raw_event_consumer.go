@@ -76,7 +76,7 @@ func (c *RawEventConsumer) InsertEvent(payload contracts.UserActivityPayload) er
 		EventType: string(payload.Type),
 
 		Timestamp: pgtype.Timestamptz{
-			Time:  payload.Timestamp,
+			Time:  payload.Timestamp.UTC(),
 			Valid: true,
 		},
 
