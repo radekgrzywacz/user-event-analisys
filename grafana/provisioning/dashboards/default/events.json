@@ -132,7 +132,95 @@
           "rawSql": "SELECT session_id, user_id, anomaly, score, threshold, event_count, unique_events, timestamp FROM ml_results ORDER BY timestamp DESC LIMIT 200;"
         }
       ]
-    }
+    },
+    {
+      "id": 100,
+      "title": "Events vs Anomalies Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_bin('1 minute', timestamp, '1970-01-01') AS time, COUNT(*) AS events FROM raw_events WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1;"
+        },
+        {
+          "refId": "B",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_bin('1 minute', created_at, '1970-01-01') AS time, COUNT(*) AS anomalies FROM aggregated_results WHERE $__timeFilter(created_at) AND (ml_anomaly OR stat_anomaly) GROUP BY 1 ORDER BY 1;"
+        }
+      ],
+      "options": {
+        "legend": { "showLegend": true, "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 102,
+      "title": "User Activity Breakdown Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 48 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_bin('1 minute', timestamp, '1970-01-01') AS time, COUNT(*) AS total FROM raw_events WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1;"
+        },
+        {
+          "refId": "B",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_bin('1 minute', timestamp, '1970-01-01') AS time, COUNT(*) FILTER (WHERE event_type='login') AS login FROM raw_events WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1;"
+        },
+        {
+          "refId": "C",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_bin('1 minute', timestamp, '1970-01-01') AS time, COUNT(*) FILTER (WHERE event_type='payment') AS payment FROM raw_events WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1;"
+        },
+        {
+          "refId": "D",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_bin('1 minute', timestamp, '1970-01-01') AS time, COUNT(*) FILTER (WHERE event_type='failed_login') AS failed_login FROM raw_events WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1;"
+        }
+      ],
+      "options": {
+        "legend": { "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 103,
+      "title": "Event Types Distribution",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT event_type AS type, COUNT(*) AS count FROM raw_events GROUP BY event_type ORDER BY count DESC;"
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "title": "Top 50 Users By Number of Events",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT user_id, COUNT(*) AS events FROM raw_events GROUP BY user_id ORDER BY events DESC LIMIT 50;"
+        }
+      ]
+    }                
   ]
 }
  
