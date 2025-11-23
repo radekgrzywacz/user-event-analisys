@@ -1,0 +1,28 @@
+name: CI/CD - Deploy to Homelab
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Stop old deployment
+        run: |
+          docker compose down || true
+
+      - name: Build updated images
+        run: |
+          docker compose build --no-cache
+
+      - name: Start updated stack
+        run: |
+          docker compose up -d
+
+      - name: Show running containers
+        run: docker ps

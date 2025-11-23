@@ -1,11 +1,11 @@
 {
-  "last_event_id": 62747,
-  "trained_at": "2025-11-20T21:58:45.198294+00:00",
-  "total_events": 62747,
-  "total_sessions": 11056,
+  "last_event_id": 265167,
+  "trained_at": "2025-11-23T02:10:21.681706+00:00",
+  "total_events": 265167,
+  "total_sessions": 46318,
   "metrics": {
-    "train_loss": 0.0023536477969693286,
-    "test_loss": 0.0020871255546808243,
-    "threshold": 0.003422927483916282
+    "train_loss": 0.024484080593663686,
+    "test_loss": 0.0011764482557270173,
+    "threshold": 0.0013201034627854822
   }
 }

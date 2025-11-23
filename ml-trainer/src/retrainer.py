@@ -91,7 +91,7 @@ class Retrainer:
                     SELECT
                         COUNT(*) AS new_events,
                         COALESCE(MAX(id), :last_id) AS max_event_id
-                    FROM events
+                    FROM raw_events
                     WHERE id > :last_id
                     """
                 ),
