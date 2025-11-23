@@ -17,12 +17,13 @@ jobs:
           docker compose down || true
 
       - name: Build updated images
-        run: |
-          docker compose build --no-cache
+        working-directory: ${{ github.workspace }}
+        run: docker compose -f docker-compose.yml build --no-cache
 
       - name: Start updated stack
-        run: |
-          docker compose up -d
+        working-directory: ${{ github.workspace }}
+        run: docker compose -f docker-compose.yml up -d
+
 
       - name: Show running containers
         run: docker ps
