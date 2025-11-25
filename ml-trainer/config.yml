@@ -11,7 +11,7 @@ training:
   model_dir: ../models
 
 retraining:
-  min_new_events: 20000
+  min_new_events: 200000
   poll_interval_seconds: 900
   max_hours_between_retrains: 6
   state_path: ../models/training_state.json
