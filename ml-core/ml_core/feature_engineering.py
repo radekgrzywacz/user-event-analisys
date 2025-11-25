@@ -33,42 +33,32 @@ def build_session_features(df: pd.DataFrame) -> pd.DataFrame:
     grouped = (
         work_df.groupby("session_id")
         .agg(
-            {
-                "user_id": "first",
-                "event_type": lambda x: list(x),
-                "ip": pd.Series.nunique,
-                "country": pd.Series.nunique,
-                "user_agent": pd.Series.nunique,
-                "hour": ["min", "max", "mean"],
-            }
+            user_id=("user_id", "first"),
+            event_sequence=("event_type", lambda x: list(x)),
+            unique_ips=("ip", pd.Series.nunique),
+            unique_countries=("country", pd.Series.nunique),
+            unique_agents=("user_agent", pd.Series.nunique),
+            min_hour=("hour", "min"),
+            max_hour=("hour", "max"),
+            avg_hour=("hour", "mean"),
         )
         .reset_index()
     )
 
-    grouped.columns = [
-        "session_id",
-        "user_id",
-        "event_sequence",
-        "unique_ips",
-        "unique_countries",
-        "unique_agents",
-        "min_hour",
-        "max_hour",
-        "avg_hour",
-    ]
-
     grouped["event_count"] = grouped["event_sequence"].apply(len)
     grouped["unique_events"] = grouped["event_sequence"].apply(lambda x: len(set(x)))
 
-    return grouped
+    grouped = grouped.sort_values("session_id").reset_index(drop=True)
+    return grouped.drop(columns=["event_sequence"])
 
 
 def preprocess(df_sessions: pd.DataFrame, fit: bool = True, scaler=None, save_dir: str = "./saved"):
-    """
-    Scale numeric session-level features. Expects df_sessions produced by build_session_features().
-    """
+
     if df_sessions.empty:
         return pd.DataFrame(columns=["session_id", *SESSION_FEATURE_COLUMNS]), scaler
+
+    # ensure deterministic order (important for consistency)
+    df_sessions = df_sessions.sort_values("session_id").reset_index(drop=True)
 
     missing = [c for c in SESSION_FEATURE_COLUMNS if c not in df_sessions.columns]
     if missing:

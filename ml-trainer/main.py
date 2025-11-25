@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -7,6 +8,7 @@ import pandas as pd
 import yaml
 from dotenv import load_dotenv
 from loguru import logger
+import psutil
 
 from ml_core import preprocess, save_artifacts, build_session_features
 from src.data_loader import load_data
@@ -55,6 +57,10 @@ def run_training(config: Dict[str, Any], df: Optional[pd.DataFrame] = None) -> D
     Execute the full training pipeline and return metadata about the run.
     When df is provided it will be used instead of loading data from the DB.
     """
+    start_time = time.time()
+    mem_before = _get_process_memory_mb()
+    logger.info(f"Memory before training: {mem_before:.2f} MB")
+
     if df is None:
         df = load_data(config["database"]["url"])
 
@@ -68,6 +74,9 @@ def run_training(config: Dict[str, Any], df: Optional[pd.DataFrame] = None) -> D
 
     logger.info(f"Built {len(df_sessions)} session feature vectors")
 
+    if df_sessions["event_count"].median() < 2:
+        logger.warning("Sessions have too few events, anomaly detector may be weak.")
+
     scaled_sessions, scaler = preprocess(df_sessions, fit=True, save_dir=config["training"]["model_dir"])
     feature_columns = [c for c in scaled_sessions.columns if c != "session_id"]
     X = scaled_sessions[feature_columns]
@@ -76,6 +85,7 @@ def run_training(config: Dict[str, Any], df: Optional[pd.DataFrame] = None) -> D
     model, metrics = train_autoencoder(X, config)
     logger.success(f"Training finished. test_loss={metrics['test_loss']:.6f}")
 
+    logger.info(f"Saving model to {config['training']['model_dir']}")
     save_artifacts(model, scaler, metrics, config["training"]["model_dir"])
     logger.success("Model, scaler, and metrics saved successfully!")
 
@@ -93,7 +103,12 @@ def run_training(config: Dict[str, Any], df: Optional[pd.DataFrame] = None) -> D
             row.get("unique_countries"),
         )
 
-    flattened_metrics = {k: float(v) for k, v in metrics.items()}
+    flattened_metrics: Dict[str, Any] = {}
+    for k, v in metrics.items():
+        if isinstance(v, (int, float)):
+            flattened_metrics[k] = float(v)
+        else:
+            flattened_metrics[k] = v
 
     metadata: Dict[str, Any] = {
         "trained_at": datetime.now(timezone.utc).isoformat(),
@@ -103,6 +118,15 @@ def run_training(config: Dict[str, Any], df: Optional[pd.DataFrame] = None) -> D
         "last_timestamp": _safe_max(df, "timestamp"),
         "metrics": flattened_metrics,
     }
+
+    duration = time.time() - start_time
+    mem_after = _get_process_memory_mb()
+    logger.info(
+        "Training finished in %.2fs (memory %.2f -> %.2f MB)",
+        duration,
+        mem_before,
+        mem_after,
+    )
     return metadata
 
 
@@ -118,6 +142,13 @@ def _safe_max(df: pd.DataFrame, column: str) -> Optional[Any]:
         except Exception:
             return value
     return value
+
+
+def _get_process_memory_mb() -> float:
+    try:
+        return psutil.Process().memory_info().rss / 1024 ** 2
+    except Exception:
+        return 0.0
 
 
 def main():

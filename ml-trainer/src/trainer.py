@@ -7,18 +7,26 @@ from tqdm import tqdm
 from ml_core import Autoencoder
 
 def _robust_threshold(errors: np.ndarray) -> float:
-    median = np.median(errors)
-    mad = np.median(np.abs(errors - median))
+    if errors.size == 0:
+        return 0.0
+
+    cap = np.percentile(errors, 99.9)
+    clipped = np.clip(errors, None, cap)
+    median = np.median(clipped)
+    mad = np.median(np.abs(clipped - median))
+    percentile_995 = np.percentile(clipped, 99.5)
+
+    candidates = [percentile_995]
     if mad > 0:
-        return float(median + 3 * mad)
+        candidates.append(median + 3 * mad)
+    else:
+        q1 = np.percentile(clipped, 25)
+        q3 = np.percentile(clipped, 75)
+        iqr = q3 - q1
+        if iqr > 0:
+            candidates.append(q3 + 1.5 * iqr)
 
-    q1 = np.percentile(errors, 25)
-    q3 = np.percentile(errors, 75)
-    iqr = q3 - q1
-    if iqr > 0:
-        return float(q3 + 1.5 * iqr)
-
-    return float(errors.max() if errors.size else 0.0)
+    return float(max(candidates))
 
 
 def _batch_reconstruction_errors(model: Autoencoder, data_loader: DataLoader) -> np.ndarray:
@@ -35,18 +43,26 @@ def train_autoencoder(X, config):
     X_tensor = torch.tensor(X.values, dtype=torch.float32)
     dataset = TensorDataset(X_tensor)
 
-    train_size = max(1, int((1 - config["training"]["test_split"]) * len(dataset)))
-    test_size = len(dataset) - train_size
+    total = len(dataset)
+    if total == 1:
+        train_size, test_size = 1, 0
+    else:
+        proposed_train = int((1 - config["training"]["test_split"]) * total)
+        train_size = min(max(proposed_train, 1), total - 1)
+        test_size = total - train_size
+
     train_ds, test_ds = random_split(dataset, [train_size, test_size])
 
     train_dl = DataLoader(train_ds, batch_size=config["training"]["batch_size"], shuffle=True)
-    test_dl = DataLoader(test_ds, batch_size=config["training"]["batch_size"], shuffle=False)
+    test_dl = DataLoader(test_ds, batch_size=config["training"]["batch_size"], shuffle=False) if test_size > 0 else None
 
     model = Autoencoder(input_dim=X.shape[1], hidden_dim=config["training"]["hidden_dim"])
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
     logger.info("Starting training loop...")
+    train_loss_history = []
+    test_loss_history = []
     for epoch in range(config["training"]["epochs"]):
         model.train()
         total_loss = 0
@@ -58,14 +74,25 @@ def train_autoencoder(X, config):
             optimizer.step()
             total_loss += loss.item()
         avg_loss = total_loss / len(train_dl)
-        logger.info(f"Epoch {epoch+1}: train_loss={avg_loss:.6f}")
+        train_loss_history.append(avg_loss)
+
+        test_epoch_loss = None
+        if test_dl is not None and len(test_dl) > 0:
+            model.eval()
+            test_errors_epoch = _batch_reconstruction_errors(model, test_dl)
+            test_epoch_loss = float(test_errors_epoch.mean()) if test_errors_epoch.size else 0.0
+            test_loss_history.append(test_epoch_loss)
+            logger.info(f"Epoch {epoch+1}: train_loss={avg_loss:.6f} val_loss={test_epoch_loss:.6f}")
+        else:
+            logger.info(f"Epoch {epoch+1}: train_loss={avg_loss:.6f} (no val set)")
 
     # Ewaluacja
     model.eval()
-    test_errors = _batch_reconstruction_errors(model, test_dl)
+    test_errors = _batch_reconstruction_errors(model, test_dl) if test_dl is not None else np.array([])
+    train_errors = _batch_reconstruction_errors(model, train_dl)
 
-    test_loss = float(test_errors.mean()) if test_errors.size else 0.0
-    threshold = _robust_threshold(test_errors)
+    test_loss = float(test_errors.mean()) if test_errors.size else (float(train_loss_history[-1]) if train_loss_history else 0.0)
+    threshold = _robust_threshold(test_errors if test_errors.size else train_errors)
 
     metrics = {
         "train_loss": avg_loss,
@@ -73,6 +100,8 @@ def train_autoencoder(X, config):
         "threshold": threshold,
         "input_dim": X.shape[1],
         "hidden_dim": config["training"]["hidden_dim"],
+        "train_loss_history": train_loss_history,
+        "val_loss_history": test_loss_history,
     }
 
     logger.info(f"Final test_loss={test_loss:.6f}, threshold={threshold:.6f}")
