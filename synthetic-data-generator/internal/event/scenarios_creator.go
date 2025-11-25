@@ -55,6 +55,118 @@ func (g *Generator) RunAnomalousLoginScenario(userID int) error {
 	return nil
 }
 
+func (g *Generator) RunIPJumpScenario(userID int) error {
+	sessionId := uuid.NewString()
+
+	login, err := g.CreateGoodEvent(userID, EventLogin)
+	if err != nil {
+		return err
+	}
+	login.SessionId = sessionId
+	if err := g.SendEvent(login); err != nil {
+		return fmt.Errorf("sending baseline login: %w", err)
+	}
+
+	time.Sleep(400 * time.Millisecond)
+
+	payment, err := g.CreateRandomEvent(userID, EventPayment)
+	if err != nil {
+		return err
+	}
+	payment.SessionId = sessionId
+	payment.Metadata.IP = g.faker.IPv4Address()
+	payment.Metadata.Country = g.faker.RandomString([]string{"CN", "BR", "RU", "ZA", "US"})
+	if err := g.SendEvent(payment); err != nil {
+		return fmt.Errorf("sending ip-jump payment: %w", err)
+	}
+
+	time.Sleep(300 * time.Millisecond)
+
+	logout, err := g.CreateRandomEvent(userID, EventLogout)
+	if err != nil {
+		return err
+	}
+	logout.SessionId = sessionId
+	logout.Metadata.IP = g.faker.IPv4Address()
+	logout.Metadata.Country = g.faker.Country()
+	if err := g.SendEvent(logout); err != nil {
+		return fmt.Errorf("sending logout after ip jump: %w", err)
+	}
+
+	return nil
+}
+
+func (g *Generator) RunWeirdCurrencyScenario(userID int) error {
+	sessionId := uuid.NewString()
+
+	login, _ := g.CreateGoodEvent(userID, EventLogin)
+	login.SessionId = sessionId
+	g.SendEvent(login)
+	time.Sleep(300 * time.Millisecond)
+
+	payment, err := g.CreateRandomEvent(userID, EventPayment)
+	if err != nil {
+		return err
+	}
+	payment.SessionId = sessionId
+	payment.Additional["currency"] = g.faker.RandomString([]string{"BTC", "ETH", "XDR", "ZWL", "MGA"})
+	payment.Additional["value"] = g.faker.Price(5000, 200000)
+	if err := g.SendEvent(payment); err != nil {
+		return fmt.Errorf("sending weird currency payment: %w", err)
+	}
+
+	logout, _ := g.CreateGoodEvent(userID, EventLogout)
+	logout.SessionId = sessionId
+	g.SendEvent(logout)
+	return nil
+}
+
+func (g *Generator) RunMissingLoginScenario(userID int) error {
+	sessionId := uuid.NewString()
+
+	payment, err := g.CreateRandomEvent(userID, EventPayment)
+	if err != nil {
+		return err
+	}
+	payment.SessionId = sessionId
+	if err := g.SendEvent(payment); err != nil {
+		return fmt.Errorf("sending payment without login: %w", err)
+	}
+
+	time.Sleep(300 * time.Millisecond)
+
+	activity, err := g.CreateRandomEvent(userID, EventOther)
+	if err != nil {
+		return err
+	}
+	activity.SessionId = sessionId
+	activity.Additional["action"] = "suspicious_browse"
+	if err := g.SendEvent(activity); err != nil {
+		return fmt.Errorf("sending activity without login: %w", err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	logout, err := g.CreateRandomEvent(userID, EventLogout)
+	if err != nil {
+		return err
+	}
+	logout.SessionId = sessionId
+	if err := g.SendEvent(logout); err != nil {
+		return fmt.Errorf("sending logout without login: %w", err)
+	}
+
+	return nil
+}
+
+func (g *Generator) RunCorruptedJSONScenario(userID int) error {
+	sessionId := uuid.NewString()
+	if err := g.SendCorruptedJSON(sessionId, userID); err != nil {
+		return fmt.Errorf("sending corrupted json payload: %w", err)
+	}
+	return nil
+}
+
 func (g *Generator) RunBruteForceScenario(userID int, attempts int) error {
 	for i := 0; i < attempts; i++ {
 		ev, err := g.CreateRandomEvent(userID, EventFailedLogin)

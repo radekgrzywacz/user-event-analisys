@@ -18,7 +18,10 @@ def load_artifacts(model_class, model_dir="./saved"):
     with open(scaler_path, "rb") as f:
         scaler = pickle.load(f)
 
-    model = model_class(input_dim=8)
+    input_dim = int(metrics.get("input_dim", 8)) if isinstance(metrics, dict) else 8
+    hidden_dim = int(metrics.get("hidden_dim", 32)) if isinstance(metrics, dict) else 32
+
+    model = model_class(input_dim=input_dim, hidden_dim=hidden_dim)
     model.load_state_dict(torch.load(model_path))
     model.eval()
 

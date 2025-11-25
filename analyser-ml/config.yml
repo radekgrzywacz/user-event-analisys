@@ -8,3 +8,5 @@ model:
   model_path: "../models/model.pt"
   scaler_path: "../models/scaler.pkl"
   metrics_path: "../models/metrics.pt"
+  input_dim: 8
+  hidden_dim: 4

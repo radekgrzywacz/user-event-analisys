@@ -70,7 +70,7 @@ services:
       - ./synthetic-data-generator/.env.docker
     ports:
       - "18080:8080"
-    command: ["./synthetic-data-generator", "-duration", "0", "-concurrency", "2", "-users", "10"]
+    command: ["./synthetic-data-generator", "-duration", "0", "-concurrency", "5", "-users", "100"]
     
   http-ingestor:
     build: 

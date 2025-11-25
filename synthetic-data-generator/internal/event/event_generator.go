@@ -118,15 +118,33 @@ func (g *Generator) SendEvent(event Event) error {
 		return fmt.Errorf("could not marshal envelope: %w", err)
 	}
 
-	body := bytes.NewBuffer(e)
-	url := fmt.Sprintf("http://%s:%s/ingestor", env.GetEnvString("INGESTOR_URL", "http-ingestor"), env.GetEnvString("INGESTOR_PORT", "8081"))
+	return g.sendRaw(e)
+}
 
-	resp, err := http.Post(url, "application/json; charset=utf-8", body)
+func (g *Generator) SendCorruptedJSON(sessionId string, userId int) error {
+	malformed := fmt.Sprintf(
+		`{"payload":{"user_id":%d,"session_id":"%s","type":"%s","timestamp":"%s","metadata":{"ip":"%s"},"additional":{"raw":"%s"}`,
+		userId,
+		sessionId,
+		string(EventLogin),
+		time.Now().Format(time.RFC3339Nano),
+		g.faker.IPv4Address(),
+		g.faker.BuzzWord(),
+	)
+	return g.sendRaw([]byte(malformed))
+}
+
+func (g *Generator) sendRaw(body []byte) error {
+	url := fmt.Sprintf(
+		"http://%s:%s/ingestor",
+		env.GetEnvString("INGESTOR_URL", "http-ingestor"),
+		env.GetEnvString("INGESTOR_PORT", "8081"),
+	)
+
+	resp, err := http.Post(url, "application/json; charset=utf-8", bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("could not send an event: %w", err)
 	}
-
 	defer resp.Body.Close()
-
 	return nil
 }

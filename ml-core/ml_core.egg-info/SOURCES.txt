@@ -1,5 +1,8 @@
 setup.py
 ml_core/__init__.py
+ml_core/feature_engineering.py
+ml_core/model.py
+ml_core/utils.py
 ml_core.egg-info/PKG-INFO
 ml_core.egg-info/SOURCES.txt
 ml_core.egg-info/dependency_links.txt

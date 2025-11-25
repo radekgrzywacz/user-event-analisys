@@ -8,9 +8,9 @@ import yaml
 from dotenv import load_dotenv
 from loguru import logger
 
-from ml_core import preprocess, save_artifacts
+from ml_core import preprocess, save_artifacts, build_session_features
 from src.data_loader import load_data
-from src.trainer import train_autoencoder
+from src.trainer import train_autoencoder, compute_reconstruction_errors
 
 BASE_DIR = Path(__file__).resolve().parent
 ENV_PATH = BASE_DIR / ".env"
@@ -62,9 +62,16 @@ def run_training(config: Dict[str, Any], df: Optional[pd.DataFrame] = None) -> D
         raise ValueError("No events available for training.")
 
     logger.info(f"Loaded {len(df)} events from database")
+    df_sessions = build_session_features(df)
+    if df_sessions.empty:
+        raise ValueError("No sessions available for training.")
 
-    X, scaler = preprocess(df, fit=True, save_dir=config["training"]["model_dir"])
-    logger.info(f"Preprocessed data shape: {X.shape}")
+    logger.info(f"Built {len(df_sessions)} session feature vectors")
+
+    scaled_sessions, scaler = preprocess(df_sessions, fit=True, save_dir=config["training"]["model_dir"])
+    feature_columns = [c for c in scaled_sessions.columns if c != "session_id"]
+    X = scaled_sessions[feature_columns]
+    logger.info(f"Preprocessed session-level data shape: {X.shape}")
 
     model, metrics = train_autoencoder(X, config)
     logger.success(f"Training finished. test_loss={metrics['test_loss']:.6f}")
@@ -72,12 +79,26 @@ def run_training(config: Dict[str, Any], df: Optional[pd.DataFrame] = None) -> D
     save_artifacts(model, scaler, metrics, config["training"]["model_dir"])
     logger.success("Model, scaler, and metrics saved successfully!")
 
+    session_errors = compute_reconstruction_errors(model, X)
+    df_sessions = df_sessions.reset_index(drop=True)
+    df_sessions["reconstruction_error"] = session_errors
+    top_anomalies = df_sessions.nlargest(5, "reconstruction_error")
+    for _, row in top_anomalies.iterrows():
+        logger.warning(
+            "Top session anomaly session_id=%s error=%.6f events=%s unique_ips=%s unique_countries=%s",
+            row["session_id"],
+            row["reconstruction_error"],
+            row.get("event_count"),
+            row.get("unique_ips"),
+            row.get("unique_countries"),
+        )
+
     flattened_metrics = {k: float(v) for k, v in metrics.items()}
 
     metadata: Dict[str, Any] = {
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "total_events": int(len(df)),
-        "total_sessions": int(X.shape[0]),
+        "total_sessions": int(df_sessions.shape[0]),
         "last_event_id": _safe_max(df, "id"),
         "last_timestamp": _safe_max(df, "timestamp"),
         "metrics": flattened_metrics,

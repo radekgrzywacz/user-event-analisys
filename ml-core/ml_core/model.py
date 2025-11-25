@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 
+
 class Autoencoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim=32):
+    def __init__(self, input_dim, hidden_dim=4):
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),

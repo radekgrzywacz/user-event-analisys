@@ -22,6 +22,10 @@ func runRandomAnomaly(g *event.Generator, userID int) {
 		g.RunAccountTakeoverScenario,
 		func(id int) error { return g.RunBotActivityScenario(id, 3) },
 		g.RunFraudTransactionScenario,
+		g.RunIPJumpScenario,
+		g.RunWeirdCurrencyScenario,
+		g.RunMissingLoginScenario,
+		g.RunCorruptedJSONScenario,
 	}
 
 	selected := scenarios[rand.IntN(len(scenarios))]
